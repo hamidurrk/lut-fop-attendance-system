@@ -26,3 +26,28 @@ body {
   background-color: rgba(16, 185, 129, 0.35);
   color: white;
 }
+
+/* QR Scanner video constraints for mobile */
+#qr-code-scanner video,
+#qr-code-scanner canvas {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 1rem;
+}
+
+/* Ensure QR scanner container doesn't overflow */
+#qr-code-scanner {
+  overflow: hidden;
+  border-radius: 1rem;
+}
+
+/* Mobile specific fixes for camera video */
+@media (max-width: 768px) {
+  #qr-code-scanner video,
+  #qr-code-scanner canvas {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+}

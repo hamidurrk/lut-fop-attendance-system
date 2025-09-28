@@ -1,25 +1,17 @@
-export const QR_PREFIX = "LUTFOP_ATTENDANCE";
-
 export function encodeStudentQR({ studentId, studentName }) {
-  return JSON.stringify({
-    p: QR_PREFIX,
-    id: studentId.trim(),
-    name: studentName.trim(),
-  });
+  // Simple format: ID|Name - preserve leading zeros in ID
+  return `${studentId}|${studentName.trim()}`;
 }
 
 export function parseStudentQR(raw) {
   try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.p !== QR_PREFIX) {
-      return null;
-    }
-    if (!parsed.id || !parsed.name) {
+    const parts = raw.split('|');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
       return null;
     }
     return {
-      studentId: String(parsed.id).trim(),
-      studentName: String(parsed.name).trim(),
+      studentId: parts[0], // Keep as string, preserve leading zeros
+      studentName: parts[1].trim(),
     };
   } catch (error) {
     return null;

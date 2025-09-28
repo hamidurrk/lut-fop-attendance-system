@@ -1,17 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-
-const QrReader = dynamic(
-  () =>
-    import("react-qr-reader").then((mod) => mod.QrReader || mod.default),
-  {
-    ssr: false,
-  }
-);
+import { Html5Qrcode } from "html5-qrcode";
 
 const AUTH_STORAGE_KEY = "lut-fop-auth";
 
@@ -65,6 +57,12 @@ function makeExportFilename(record, extension) {
   return `${base || "attendance"}.${extension}`;
 }
 
+const QR_SCANNER_BENIGN_ERROR_NAMES = new Set([
+  "No QR code found",
+  "QR code parse error",
+  "Camera error"
+]);
+
 export default function TeacherDashboard() {
   const router = useRouter();
   const [auth, setAuth] = useState(null);
@@ -74,7 +72,6 @@ export default function TeacherDashboard() {
   const [createForm, setCreateForm] = useState({ className: "", recordName: "" });
   const [activeRecord, setActiveRecord] = useState(null);
   const [isScannerActive, setIsScannerActive] = useState(false);
-  const [isScannerPaused, setIsScannerPaused] = useState(false);
   const [scannedStudents, setScannedStudents] = useState(new Map());
   const [selectedTeacher, setSelectedTeacher] = useState("all");
   const [adminTab, setAdminTab] = useState("analytics");
@@ -94,7 +91,20 @@ export default function TeacherDashboard() {
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
   const [cameraError, setCameraError] = useState(null);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [scannerStatus, setScannerStatus] = useState("idle");
   const isAdmin = auth?.teacher.role === "admin";
+  
+  const html5QrCodeRef = useRef(null);
+  const scannerElementRef = useRef(null);
+  const processedQrsRef = useRef(new Set());
+  const lastQrRef = useRef(null);
+  const lastQrTimeRef = useRef(0);
+  const restartTimerRef = useRef(null);
+  const isScannerActiveRef = useRef(false);
+  const isStartingRef = useRef(false);
+  const isStoppingRef = useRef(false);
+  const isSwitchingRef = useRef(false);
+  const desiredDeviceIdRef = useRef(null);
 
   useEffect(() => {
     const stored = loadAuth();
@@ -339,18 +349,25 @@ export default function TeacherDashboard() {
         return;
       }
 
-      const currentDeviceStillAvailable = videoInputs.some(
-        (device) => device.deviceId === selectedDeviceId
-      );
+      const currentDeviceStillAvailable = selectedDeviceId
+        ? videoInputs.some((device) => device.deviceId === selectedDeviceId)
+        : false;
 
-      if (!currentDeviceStillAvailable) {
+      if (!currentDeviceStillAvailable && !selectedDeviceId) {
+        const fallbackDevice = videoInputs[0];
+        if (!fallbackDevice) {
+          setSelectedDeviceId(null);
+          return;
+        }
+
         if (isMobileDevice) {
-          const frontFacing = videoInputs.find((device) =>
-            /front|user|face/i.test(device.label)
+          const backFacing = videoInputs.find((device) =>
+            /back|rear|environment/i.test(device.label)
           );
-          setSelectedDeviceId((frontFacing || videoInputs[0]).deviceId);
+          const chosenDevice = backFacing || fallbackDevice;
+          setSelectedDeviceId(chosenDevice.deviceId);
         } else {
-          setSelectedDeviceId(videoInputs[0].deviceId);
+          setSelectedDeviceId(fallbackDevice.deviceId);
         }
       }
     } catch (error) {
@@ -361,10 +378,21 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (!isScannerActive) {
       setCameraError(null);
-      setIsScannerPaused(false);
       setCameraDevices([]);
       setSelectedDeviceId(null);
+      setScannerStatus("idle");
+      processedQrsRef.current.clear();
+      lastQrRef.current = null;
+      lastQrTimeRef.current = 0;
+      if (restartTimerRef.current) {
+        clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = null;
+      }
     }
+  }, [isScannerActive]);
+
+  useEffect(() => {
+    isScannerActiveRef.current = isScannerActive;
   }, [isScannerActive]);
 
   useEffect(() => {
@@ -405,18 +433,6 @@ export default function TeacherDashboard() {
     };
   }, [isScannerActive, loadCameraDevices]);
 
-  const cameraConstraints = useMemo(() => {
-    if (selectedDeviceId) {
-      return {
-        deviceId: { exact: selectedDeviceId },
-      };
-    }
-
-    return {
-      facingMode: { ideal: "user" },
-    };
-  }, [selectedDeviceId]);
-
   const currentCameraLabel = useMemo(() => {
     if (!selectedDeviceId) {
       return null;
@@ -436,18 +452,19 @@ export default function TeacherDashboard() {
   }, [cameraDevices, selectedDeviceId]);
 
   const cycleCamera = useCallback(() => {
-    if (cameraDevices.length < 2) {
-      return;
+  }, []);
+
+  const qrReaderConstraints = useMemo(() => {
+    const baseConstraints = {
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    };
+    
+    if (selectedDeviceId) {
+      return { ...baseConstraints, deviceId: { exact: selectedDeviceId } };
     }
-
-    const currentIndex = cameraDevices.findIndex(
-      (device) => device.deviceId === selectedDeviceId
-    );
-
-    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % cameraDevices.length;
-    const nextDevice = cameraDevices[nextIndex];
-    setSelectedDeviceId(nextDevice.deviceId);
-  }, [cameraDevices, selectedDeviceId]);
+    return { ...baseConstraints, facingMode: isMobileDevice ? "environment" : "user" };
+  }, [isMobileDevice, selectedDeviceId]);
 
   const handleExportRecord = useCallback(
     async (record, format) => {
@@ -474,7 +491,7 @@ export default function TeacherDashboard() {
             const data = await res.json();
             message = data.error || message;
           } catch (ignore) {
-            // ignore JSON parse errors
+            
           }
           throw new Error(message);
         }
@@ -525,61 +542,334 @@ export default function TeacherDashboard() {
         ...data.record,
         teacherId: auth.teacher.teacherId,
       });
-  setIsScannerActive(true);
-  setIsScannerPaused(false);
+      setIsScannerActive(true);
       setShowCreate(false);
       setCreateForm({ className: "", recordName: "" });
       setScannedStudents(new Map());
+      processedQrsRef.current.clear();
+      lastQrRef.current = null;
+      lastQrTimeRef.current = 0;
+      setCameraError(null);
+      setScannerStatus("loading");
       await refreshRecords();
     } catch (error) {
       toast.error(error.message);
     }
   };
 
-  const handleScanResult = async (result, error) => {
-    if (error) {
-      console.error("QR reader error", error);
-      setCameraError(error?.message || "Unable to access the camera feed");
-      return;
-    }
-    if (!result?.text || !activeRecord || !auth?.token) return;
+  const handleScanResult = useCallback(
+    async (decodedText) => {
+      if (!decodedText || !activeRecord || !auth?.token) {
+        return;
+      }
 
-    if (isScannerPaused) {
-      return;
-    }
+      const now = Date.now();
+      
+      if (lastQrRef.current === decodedText && (now - lastQrTimeRef.current) < 1000) {
+        return;
+      }
 
-    if (cameraError) {
-      setCameraError(null);
-    }
+      if (processedQrsRef.current.has(decodedText)) {
+        return;
+      }
 
-    const payload = result.text;
-    if (scannedStudents.has(payload)) {
-      return;
-    }
+      console.log('Processing QR Code:', decodedText);
+      
+      lastQrRef.current = decodedText;
+      lastQrTimeRef.current = now;
+      processedQrsRef.current.add(decodedText);
+      
+      try {
+        const response = await api("/api/attendance/mark", {
+          method: "POST",
+          token: auth.token,
+          body: {
+            recordId: activeRecord.recordId,
+            qrPayload: decodedText,
+            teacherId: activeRecord.teacherId,
+          },
+        });
+
+        toast.success(
+          `Marked ${response.attendance.studentName} (${response.attendance.studentId})`
+        );
+        
+        setScannedStudents((prev) => {
+          const next = new Map(prev);
+          next.set(decodedText, response.attendance);
+          return next;
+        });
+
+        await refreshRecords();
+      } catch (err) {
+        toast.error(err.message);
+        processedQrsRef.current.delete(decodedText);
+      }
+    },
+    [activeRecord, auth, refreshRecords]
+  );
+
+  const startQrScanner = useCallback(async () => {
+    if (isStartingRef.current) return;
+    if (html5QrCodeRef.current || !scannerElementRef.current) return;
 
     try {
-      const response = await api("/api/attendance/mark", {
-        method: "POST",
-        token: auth.token,
-        body: {
-          recordId: activeRecord.recordId,
-          qrPayload: payload,
-          teacherId: activeRecord.teacherId,
+      isStartingRef.current = true;
+      setScannerStatus("loading");
+      setCameraError(null);
+
+      let videoInputs = [];
+      if (navigator?.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        videoInputs = devices.filter((d) => d.kind === "videoinput");
+        setCameraDevices(videoInputs.map(d => ({ deviceId: d.deviceId, label: d.label })));
+      }
+
+      let deviceId = desiredDeviceIdRef.current || null;
+      const hasSelected = selectedDeviceId && videoInputs.some(d => d.deviceId === selectedDeviceId);
+      if (!deviceId && hasSelected) {
+        deviceId = selectedDeviceId;
+      } else if (!deviceId && videoInputs.length > 0) {
+        if (isMobileDevice) {
+          const back = videoInputs.find(d => d.label && /back|rear|environment/i.test(d.label));
+          deviceId = (back || videoInputs[0]).deviceId;
+        } else {
+          deviceId = videoInputs[0].deviceId;
+        }
+        if (deviceId && selectedDeviceId !== deviceId) {
+          setSelectedDeviceId(deviceId);
+        }
+      }
+      desiredDeviceIdRef.current = deviceId || null;
+
+  const html5QrCode = new Html5Qrcode("qr-code-scanner");
+      html5QrCodeRef.current = html5QrCode;
+
+      const config = {
+        fps: 10,
+        qrbox: { width: 200, height: 200 },
+        aspectRatio: 1.0,
+        disableFlip: false,
+        videoConstraints: {
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 }
+        }
+      };
+
+      const startArg = deviceId ? deviceId : ({ facingMode: isMobileDevice ? "environment" : "user" });
+
+      await html5QrCode.start(
+        startArg,
+        config,
+        (decodedText) => {
+          if (!isScannerActive) return;
+          handleScanResult(decodedText);
         },
-      });
-
-      toast.success(
-        `Marked ${response.attendance.studentName} (${response.attendance.studentId})`
+        (errorMessage) => {
+          if (errorMessage.includes("No QR code found") || errorMessage.includes("QR code parse error")) {
+            return;
+          }
+          console.warn("QR Scanner error:", errorMessage);
+        }
       );
-      const newMap = new Map(scannedStudents);
-      newMap.set(payload, response.attendance);
-      setScannedStudents(newMap);
 
-      await refreshRecords();
-    } catch (err) {
-      toast.error(err.message);
+      setScannerStatus("ready");
+      console.log("QR scanner started successfully");
+    } catch (error) {
+      console.error("Failed to start QR scanner:", error);
+
+      let errorMessage = `Camera error: ${error.message || 'Failed to access camera'}`;
+
+      if (error.message && error.message.includes('secure context')) {
+        const currentUrl = window.location.href;
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+        if (isLocalhost) {
+          errorMessage = "Camera requires HTTPS. Please use 'npm run dev' instead of 'npm run dev-http' for HTTPS support.";
+        } else {
+          errorMessage = `Camera access requires HTTPS on mobile devices. Current URL: ${currentUrl}
+
+Solutions:
+1. Use ngrok: Run 'npm run dev-mobile' on your computer, then use the HTTPS URL from ngrok
+2. Enable camera on HTTP: In Chrome mobile, go to Settings > Site Settings > Camera > Add exception for this site
+3. Use localhost: Access via http://localhost:3000 if on the same device`;
+        }
+      } else if (error.name === "NotAllowedError") {
+        errorMessage = "Camera access denied. Please grant camera permission and reload the page.";
+      } else if (error.name === "NotReadableError") {
+        errorMessage = "Camera is busy or not available. Please close other apps using the camera and try again.";
+      } else if (error.name === "NotSupportedError") {
+        errorMessage = "Camera is not supported on this device or browser.";
+      }
+
+      setCameraError(errorMessage);
+      setScannerStatus("error");
+      html5QrCodeRef.current = null;
     }
-  };
+    finally {
+      isStartingRef.current = false;
+    }
+  }, [isScannerActive, handleScanResult, selectedDeviceId, isMobileDevice]);
+
+  const stopScannerOnly = useCallback(async () => {
+    if (!html5QrCodeRef.current) return;
+    if (isStoppingRef.current) return;
+    const scanner = html5QrCodeRef.current;
+    try {
+      isStoppingRef.current = true;
+      if (restartTimerRef.current) {
+        clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = null;
+      }
+      try {
+        await scanner.stop();
+      } catch (e) {
+        console.warn('scanner.stop() failed, continuing with manual track stop', e);
+        try {
+          const container = document.getElementById('qr-code-scanner');
+          if (container) {
+            const videos = container.querySelectorAll('video');
+            videos.forEach((video) => {
+              if (video.srcObject) {
+                const tracks = video.srcObject.getTracks();
+                tracks.forEach((track) => track.stop());
+                video.srcObject = null;
+              }
+            });
+          }
+        } catch {}
+      }
+    } finally {
+      isStoppingRef.current = false;
+    }
+  }, []);
+
+  const teardownScanner = useCallback(async () => {
+    if (!html5QrCodeRef.current) {
+      setScannerStatus("idle");
+      return;
+    }
+    const scanner = html5QrCodeRef.current;
+    try {
+      console.log('Tearing down QR scanner...');
+      await stopScannerOnly();
+      try {
+        await scanner.clear();
+      } catch (e) {
+        console.warn('scanner.clear() failed, continuing', e);
+      }
+    } finally {
+      html5QrCodeRef.current = null;
+      setScannerStatus("idle");
+      console.log('QR scanner teardown completed');
+    }
+  }, [stopScannerOnly]);
+
+  const switchToDevice = useCallback(async (deviceId) => {
+    if (!deviceId) return;
+    desiredDeviceIdRef.current = deviceId;
+    if (!html5QrCodeRef.current) {
+      setSelectedDeviceId(deviceId);
+      return;
+    }
+    if (isSwitchingRef.current) return;
+    isSwitchingRef.current = true;
+    setScannerStatus("loading");
+    try {
+      await stopScannerOnly();
+
+      const scanner = html5QrCodeRef.current;
+      if (!scanner) {
+        setSelectedDeviceId(deviceId);
+        return;
+      }
+
+      const config = {
+        fps: 10,
+        qrbox: { width: 200, height: 200 },
+        aspectRatio: 1.0,
+        disableFlip: false,
+        videoConstraints: {
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 }
+        }
+      };
+
+      await scanner.start(
+        deviceId,
+        config,
+        (decodedText) => {
+          if (!isScannerActiveRef.current) return;
+          handleScanResult(decodedText);
+        },
+        (errorMessage) => {
+          if (errorMessage.includes("No QR code found") || errorMessage.includes("QR code parse error")) {
+            return;
+          }
+          console.warn("QR Scanner error:", errorMessage);
+        }
+      );
+
+      setSelectedDeviceId(deviceId);
+      setScannerStatus("ready");
+      console.log('Switched camera successfully');
+    } catch (error) {
+      console.error('Failed to switch camera', error);
+      toast.error('Unable to switch camera');
+      try {
+        const scanner = html5QrCodeRef.current;
+        if (scanner) {
+          await scanner.start(
+            { facingMode: isMobileDevice ? 'environment' : 'user' },
+            {
+              fps: 10,
+              qrbox: { width: 200, height: 200 },
+              aspectRatio: 1.0,
+              disableFlip: false,
+            },
+            (decodedText) => {
+              if (!isScannerActiveRef.current) return;
+              handleScanResult(decodedText);
+            },
+            () => {}
+          );
+          setScannerStatus('ready');
+        }
+      } catch {}
+    } finally {
+      isSwitchingRef.current = false;
+    }
+  }, [handleScanResult, isMobileDevice]);
+
+  const cycleCameraReal = useCallback(async () => {
+    if (cameraDevices.length < 2) return;
+    const currentIndex = cameraDevices.findIndex((d) => d.deviceId === selectedDeviceId);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % cameraDevices.length;
+    const nextDevice = cameraDevices[nextIndex];
+    await switchToDevice(nextDevice.deviceId);
+  }, [cameraDevices, selectedDeviceId, switchToDevice]);
+
+  
+  useEffect(() => { (cycleCamera).toString(); });
+
+  useEffect(() => {
+    if (isScannerActive && !html5QrCodeRef.current) {
+      startQrScanner();
+    }
+  }, [isScannerActive, startQrScanner]);
+
+
+  useEffect(() => {
+    return () => {
+      if (restartTimerRef.current) {
+        clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = null;
+      }
+      if (html5QrCodeRef.current) {
+        teardownScanner();
+      }
+    };
+  }, [teardownScanner]);
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -686,7 +976,7 @@ export default function TeacherDashboard() {
       )}
 
       {isScannerActive && activeRecord && (
-        <div className="grid gap-6 rounded-3xl border border-white/10 bg-slate-900/70 p-6 lg:grid-cols-[320px_1fr]">
+        <div className="grid gap-6 rounded-3xl border border-white/10 bg-slate-900/70 p-4 lg:p-6 lg:grid-cols-[320px_1fr]">
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-white">
               Live scanner
@@ -697,29 +987,48 @@ export default function TeacherDashboard() {
               Session <span className="font-medium text-white">{activeRecord.recordName}</span>
             </p>
             <div className="space-y-3">
-              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-inner">
-                <div className="aspect-[4/3] w-full">
-                  <QrReader
-                    constraints={cameraConstraints}
-                    onResult={handleScanResult}
-                    onError={(error) => {
-                      if (error) {
-                        console.error("QR reader init error", error);
-                        setCameraError(error?.message || "Unable to open the camera");
-                      }
-                    }}
-                    containerStyle={{ width: "100%", height: "100%" }}
-                    videoContainerStyle={{ width: "100%", height: "100%" }}
-                    videoStyle={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                </div>
-                {cameraError && (
-                  <div className="absolute inset-0 grid place-items-center bg-slate-950/85 px-4 text-center text-xs text-red-200">
-                    <div>
-                      <p className="font-semibold">{cameraError}</p>
-                      <p className="mt-2 text-[10px] text-red-100/70">
-                        Check browser camera permissions or choose another device below.
-                      </p>
+              <div
+                className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-inner w-full"
+                style={{ 
+                  aspectRatio: "4 / 3", 
+                  minHeight: "240px",
+                  maxHeight: "400px",
+                  maxWidth: "100%"
+                }}
+              >
+                <div
+                  id="qr-code-scanner"
+                  ref={scannerElementRef}
+                  className="h-full w-full [&>video]:!h-full [&>video]:!w-full [&>video]:!object-cover [&>video]:!max-w-none [&>canvas]:!h-full [&>canvas]:!w-full [&>canvas]:!object-cover [&>canvas]:!max-w-none"
+                />
+                {(cameraError || scannerStatus === "loading") && (
+                  <div className="absolute inset-0 grid place-items-center bg-slate-950/85 px-4 text-center text-xs text-slate-100">
+                    {scannerStatus === "loading" && !cameraError ? (
+                      <div>
+                        <p className="font-semibold text-emerald-100">Initializing camera…</p>
+                        <p className="mt-2 text-[10px] text-emerald-100/70">
+                          Allow camera access in your browser to start scanning.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="max-w-sm">
+                        <p className="font-semibold text-red-200 mb-2">Camera Access Error</p>
+                        <div className="text-[10px] text-red-100/90 whitespace-pre-line leading-relaxed">
+                          {cameraError}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {scannerStatus === "ready" && !cameraError && (
+                  <div className="absolute inset-4 border-2 border-emerald-400/50 rounded-lg pointer-events-none">
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-emerald-400"></div>
+                    <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-emerald-400"></div>
+                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-emerald-400"></div>
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-emerald-400"></div>
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-emerald-200 text-xs font-medium bg-slate-950/70 px-2 py-1 rounded">
+                      Ready to scan QR codes
                     </div>
                   </div>
                 )}
@@ -727,17 +1036,12 @@ export default function TeacherDashboard() {
               <div className="space-y-2">
                 {currentCameraLabel && (
                   <p className="text-xs text-slate-400">
-                    Active camera: <span className="text-slate-200">{currentCameraLabel}</span>
+                    Camera: <span className="text-slate-200">{currentCameraLabel}</span>
                   </p>
                 )}
                 {!currentCameraLabel && cameraDevices.length === 0 && (
                   <p className="text-xs text-amber-300">
-                    Waiting for camera access. Please grant permission or connect a webcam.
-                  </p>
-                )}
-                {isScannerPaused && (
-                  <p className="text-xs text-amber-200">
-                    Scanning is paused. The video feed stays live, but QR codes won&apos;t be recorded.
+                    Waiting for camera access...
                   </p>
                 )}
                 {!isMobileDevice && cameraDevices.length > 1 && (
@@ -763,35 +1067,35 @@ export default function TeacherDashboard() {
                 {isMobileDevice && cameraDevices.length > 1 && (
                   <button
                     type="button"
-                    onClick={cycleCamera}
-                    className="inline-flex w-full items-center justify-center rounded-full border border-white/20 px-4 py-2 text-sm text-slate-200 transition hover:border-emerald-300 hover:text-white"
+                    onClick={cycleCameraReal}
+                    disabled={scannerStatus === "loading"}
+                    className="inline-flex w-full items-center justify-center rounded-full border border-white/20 px-4 py-2 text-sm text-slate-200 transition hover:border-emerald-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Switch camera
+                    {scannerStatus === "loading" ? "Switching..." : `Switch Camera (${currentCameraLabel || 'Unknown'})`}
                   </button>
                 )}
               </div>
             </div>
-            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <div className="mt-4">
               <button
                 type="button"
-                onClick={() => setIsScannerPaused((prev) => !prev)}
-                className="inline-flex w-full items-center justify-center rounded-full border border-white/20 px-4 py-2 text-sm text-slate-200 transition hover:border-emerald-400 hover:text-white"
-              >
-                {isScannerPaused ? "Resume scanning" : "Pause scanning"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
+                onClick={async () => {
+                  
                   setIsScannerActive(false);
-                  setIsScannerPaused(false);
+                  await teardownScanner();
                   setCameraDevices([]);
                   setSelectedDeviceId(null);
                   setActiveRecord(null);
                   setScannedStudents(new Map());
+                  processedQrsRef.current.clear();
+                  lastQrRef.current = null;
+                  lastQrTimeRef.current = 0;
+                  setScannerStatus("idle");
+                  setCameraError(null);
                 }}
-                className="inline-flex w-full items-center justify-center rounded-full border border-red-400/50 px-4 py-2 text-sm text-red-200 transition hover:border-red-400 hover:text-white"
+                className="inline-flex w-full items-center justify-center rounded-full border border-red-400/50 px-6 py-3 text-sm font-medium text-red-200 transition hover:border-red-400 hover:bg-red-500/10 hover:text-white"
               >
-                Stop scanning
+                Stop Scanner
               </button>
             </div>
           </div>
@@ -1269,16 +1573,16 @@ export default function TeacherDashboard() {
                             type="button"
                             onClick={() => {
                               setIsScannerActive(true);
-                              setIsScannerPaused(false);
                               setCameraError(null);
+                              setScannerStatus("loading");
                             }}
                             className="inline-flex items-center gap-2 rounded-full bg-emerald-400/90 px-4 py-2 text-xs font-semibold text-emerald-950"
                           >
-                            {isScannerActive
-                              ? isScannerPaused
-                                ? "Resume scanning"
-                                : "View scanner"
-                              : "Resume scanning"}
+                            Start scanner
+
+
+
+
                           </button>
                         ) : (
                           <button
@@ -1286,9 +1590,13 @@ export default function TeacherDashboard() {
                             onClick={() => {
                               setActiveRecord({ ...record });
                               setIsScannerActive(true);
-                              setIsScannerPaused(false);
                               setCameraError(null);
                               setScannedStudents(new Map());
+                              
+                              processedQrsRef.current.clear();
+                              lastQrRef.current = null;
+                              lastQrTimeRef.current = 0;
+                              setScannerStatus("loading");
                             }}
                             className="inline-flex items-center gap-2 rounded-full border border-emerald-400/50 px-4 py-2 text-xs font-semibold text-emerald-200"
                           >

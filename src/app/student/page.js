@@ -19,16 +19,22 @@ export default function StudentPage() {
 
   const onSubmit = ({ name, studentId }) => {
     const trimmedName = name.trim();
-    const trimmedId = studentId.trim();
+    const trimmedId = studentId; // Don't trim to preserve leading zeros
 
     if (!trimmedName || !trimmedId) {
       toast.error("Please provide both your name and student ID");
       return;
     }
 
-    const payload = encodeStudentQR({ studentId: trimmedId, studentName: trimmedName });
+    const payload = encodeStudentQR({ 
+      studentId: trimmedId, // Preserve as string with leading zeros
+      studentName: trimmedName
+    });
     setQrPayload(payload);
-    setStudentMeta({ name: trimmedName, studentId: trimmedId });
+    setStudentMeta({ 
+      name: trimmedName, 
+      studentId: trimmedId
+    });
     toast.success("QR code generated. Screenshot or save it for check-in!");
   };
 
@@ -41,13 +47,13 @@ export default function StudentPage() {
     let cancelled = false;
 
     QRCode.toDataURL(qrPayload, {
-      errorCorrectionLevel: "H",
+      errorCorrectionLevel: "M",
       color: {
-        dark: "#22c55eff",
-        light: "#0f172aff",
+        dark: "#000000",
+        light: "#FFFFFF",
       },
       margin: 2,
-      width: 220,
+      width: 200,
     })
       .then((url) => {
         if (!cancelled) {

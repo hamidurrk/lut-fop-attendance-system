@@ -67,6 +67,25 @@ export async function markAttendance({
   const { rows } = await readRows(attendanceSheetName(), ATTENDANCE_HEADERS);
   const timestamp = new Date().toISOString();
 
+  // Find the meta record to get className and recordName
+  const metaRecord = rows.find((row) => {
+    const [rowRecordId, rowTeacherId, , , studentId] = row;
+    return (
+      normalizeString(rowRecordId) === recordId &&
+      normalizeString(rowTeacherId) === teacherId &&
+      normalizeString(studentId) === META_FLAG
+    );
+  });
+
+  if (!metaRecord) {
+    throw new Error(
+      "Record not found. Ensure you created the record before scanning."
+    );
+  }
+
+  // Extract className and recordName from the meta record
+  const [, , className, recordName] = metaRecord;
+
   const duplicate = rows.find((row) => {
     const [rowRecordId, rowTeacherId, , , studentId] = row;
     return (
@@ -80,28 +99,13 @@ export async function markAttendance({
     throw new Error("Student already marked for this record.");
   }
 
-  const recordExists = rows.some((row) => {
-    const [rowRecordId, rowTeacherId, , , studentId] = row;
-    return (
-      normalizeString(rowRecordId) === recordId &&
-      normalizeString(rowTeacherId) === teacherId &&
-      normalizeString(studentId) === META_FLAG
-    );
-  });
-
-  if (!recordExists) {
-    throw new Error(
-      "Record not found. Ensure you created the record before scanning."
-    );
-  }
-
   await appendRow(
     attendanceSheetName(),
     [
       recordId,
       teacherId,
-      "",
-      "",
+      className, // Now includes the actual className
+      recordName, // Now includes the actual recordName
       parsed.studentId,
       parsed.studentName,
       timestamp,

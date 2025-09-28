@@ -1,5 +1,3 @@
-import { google } from "googleapis";
-
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]; // read/write
 
 export const TEACHER_HEADERS = [
@@ -47,7 +45,7 @@ export const REQUEST_HEADERS = [
 const DEFAULT_INVITES_SHEET = "TeacherInvites";
 const DEFAULT_REQUESTS_SHEET = "TeacherRequests";
 
-let sheetsClient;
+let sheetsClientPromise;
 
 function getEnvVar(key, optional = false) {
   const value = process.env[key];
@@ -61,32 +59,34 @@ function getSpreadsheetId() {
   return getEnvVar("GOOGLE_SPREADSHEET_ID");
 }
 
-function getJwtClient() {
-  if (sheetsClient) {
-    return sheetsClient;
+async function getSheetsClient() {
+  if (sheetsClientPromise) {
+    return sheetsClientPromise;
   }
 
-  const clientEmail = getEnvVar("GOOGLE_SERVICE_ACCOUNT_EMAIL");
-  const privateKey = getEnvVar("GOOGLE_SERVICE_ACCOUNT_KEY");
+  sheetsClientPromise = (async () => {
+    const { google } = await import("googleapis");
+    const clientEmail = getEnvVar("GOOGLE_SERVICE_ACCOUNT_EMAIL");
+    const privateKey = getEnvVar("GOOGLE_SERVICE_ACCOUNT_KEY");
 
-  const jwt = new google.auth.JWT({
-    email: clientEmail,
-    key: privateKey.replace(/\\n/g, "\n"),
-    scopes: SCOPES,
-  });
+    const jwt = new google.auth.JWT({
+      email: clientEmail,
+      key: privateKey.replace(/\\n/g, "\n"),
+      scopes: SCOPES,
+    });
 
-  sheetsClient = google.sheets({
-    version: "v4",
-    auth: jwt,
-  });
+    return google.sheets({
+      version: "v4",
+      auth: jwt,
+    });
+  })();
 
-  return sheetsClient;
+  return sheetsClientPromise;
 }
 
 async function ensureHeaders(sheetName, headers) {
   if (!headers?.length) return;
-
-  const sheets = getJwtClient();
+  const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
   let currentHeaders = [];
@@ -121,7 +121,7 @@ async function ensureHeaders(sheetName, headers) {
 }
 
 export async function appendRow(sheetName, values, headers) {
-  const sheets = getJwtClient();
+  const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
   await ensureHeaders(sheetName, headers);
   await sheets.spreadsheets.values.append({
@@ -135,7 +135,7 @@ export async function appendRow(sheetName, values, headers) {
 }
 
 export async function readRows(sheetName, headers) {
-  const sheets = getJwtClient();
+  const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
   await ensureHeaders(sheetName, headers);
 
@@ -155,7 +155,7 @@ export async function readRows(sheetName, headers) {
 
 export async function batchAppend(sheetName, rows, headers) {
   if (!rows.length) return;
-  const sheets = getJwtClient();
+  const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
   await ensureHeaders(sheetName, headers);
 
@@ -190,7 +190,7 @@ export function teacherRequestSheetName() {
 }
 
 export async function updateRow(sheetName, rowIndex, values) {
-  const sheets = getJwtClient();
+  const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
   const columnEnd = String.fromCharCode("A".charCodeAt(0) + Math.max(values.length - 1, 0));
   const range = `${sheetName}!A${rowIndex}:${columnEnd}${rowIndex}`;
