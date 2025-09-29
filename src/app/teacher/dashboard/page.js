@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -67,6 +67,7 @@ export default function TeacherDashboard() {
   const router = useRouter();
   const [auth, setAuth] = useState(null);
   const [records, setRecords] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ className: "", recordName: "" });
@@ -136,7 +137,8 @@ export default function TeacherDashboard() {
         const data = await api(`/api/attendance/list${query}`, {
           token: auth.token,
         });
-        setRecords(data.records);
+        setRecords(data.records ?? []);
+        setTeachers(data.teachers ?? []);
       } catch (error) {
         toast.error(error.message);
       } finally {
@@ -451,9 +453,6 @@ export default function TeacherDashboard() {
     return cameraDevices.length === 1 ? "Default camera" : null;
   }, [cameraDevices, selectedDeviceId]);
 
-  const cycleCamera = useCallback(() => {
-  }, []);
-
   const qrReaderConstraints = useMemo(() => {
     const baseConstraints = {
       width: { ideal: 1280 },
@@ -618,31 +617,77 @@ export default function TeacherDashboard() {
       setScannerStatus("loading");
       setCameraError(null);
 
+      // Request permission first to ensure we get camera labels
+      try {
+        await navigator.mediaDevices.getUserMedia({video: true});
+      } catch (err) {
+        console.warn("Could not pre-request camera permission", err);
+      }
+      
+      // Fresh enumeration of cameras with labels
       let videoInputs = [];
       if (navigator?.mediaDevices?.enumerateDevices) {
         const devices = await navigator.mediaDevices.enumerateDevices();
         videoInputs = devices.filter((d) => d.kind === "videoinput");
-        setCameraDevices(videoInputs.map(d => ({ deviceId: d.deviceId, label: d.label })));
+        
+        // Enhanced camera labeling for debugging
+        const enhancedCameras = videoInputs.map((device, index) => ({
+          deviceId: device.deviceId,
+          label: device.label || `Camera ${index+1}`,
+          isBack: device.label && /back|rear|environment/i.test(device.label),
+          isFront: device.label && /front|face|user/i.test(device.label),
+          index
+        }));
+        
+        console.log("Available cameras:", enhancedCameras.map(d => 
+          `${d.label} (${d.isBack ? 'BACK' : d.isFront ? 'FRONT' : 'UNKNOWN'})`));
+        
+        // Set the detected cameras with better labels
+        setCameraDevices(videoInputs);
       }
 
-      let deviceId = desiredDeviceIdRef.current || null;
-      const hasSelected = selectedDeviceId && videoInputs.some(d => d.deviceId === selectedDeviceId);
-      if (!deviceId && hasSelected) {
-        deviceId = selectedDeviceId;
-      } else if (!deviceId && videoInputs.length > 0) {
-        if (isMobileDevice) {
-          const back = videoInputs.find(d => d.label && /back|rear|environment/i.test(d.label));
-          deviceId = (back || videoInputs[0]).deviceId;
+      // Select camera with priority:
+      // 1. Previously desired camera (if available)
+      // 2. Back camera on mobile
+      // 3. First available camera
+      let deviceId = null;
+      
+      // If we have a desired camera from before, try to use it
+      if (desiredDeviceIdRef.current) {
+        const stillExists = videoInputs.some(d => d.deviceId === desiredDeviceIdRef.current);
+        if (stillExists) {
+          deviceId = desiredDeviceIdRef.current;
+          console.log("Using previously selected camera:", deviceId);
+        }
+      }
+      
+      // Otherwise, on mobile prefer back camera
+      if (!deviceId && isMobileDevice && videoInputs.length > 0) {
+        const backCamera = videoInputs.find(d => 
+          d.label && /back|rear|environment/i.test(d.label)
+        );
+        
+        if (backCamera) {
+          deviceId = backCamera.deviceId;
+          console.log("Selected back camera:", backCamera.label);
         } else {
+          // If no obvious back camera found, use first camera
           deviceId = videoInputs[0].deviceId;
-        }
-        if (deviceId && selectedDeviceId !== deviceId) {
-          setSelectedDeviceId(deviceId);
+          console.log("No back camera found, using first:", videoInputs[0].label || "Unlabeled camera");
         }
       }
-      desiredDeviceIdRef.current = deviceId || null;
-
-  const html5QrCode = new Html5Qrcode("qr-code-scanner");
+      // For non-mobile or fallback, use first camera
+      else if (!deviceId && videoInputs.length > 0) {
+        deviceId = videoInputs[0].deviceId;
+        console.log("Using default camera:", videoInputs[0].label || "Unlabeled camera");
+      }
+      
+      // Update both the ref and state to stay in sync
+      desiredDeviceIdRef.current = deviceId;
+      setSelectedDeviceId(deviceId);
+      
+      // Create scanner
+      const html5QrCode = new Html5Qrcode("qr-code-scanner");
       html5QrCodeRef.current = html5QrCode;
 
       const config = {
@@ -650,23 +695,25 @@ export default function TeacherDashboard() {
         qrbox: { width: 200, height: 200 },
         aspectRatio: 1.0,
         disableFlip: false,
-        videoConstraints: {
-          width: { min: 640, ideal: 1280, max: 1920 },
-          height: { min: 480, ideal: 720, max: 1080 }
-        }
       };
 
-      const startArg = deviceId ? deviceId : ({ facingMode: isMobileDevice ? "environment" : "user" });
+      // Always use specific constraints format for consistent behavior
+      const cameraConstraints = deviceId 
+        ? { deviceId: { exact: deviceId } }
+        : { facingMode: { exact: isMobileDevice ? "environment" : "user" } };
+      
+      console.log("Starting scanner with constraints:", JSON.stringify(cameraConstraints));
 
       await html5QrCode.start(
-        startArg,
+        cameraConstraints,
         config,
         (decodedText) => {
           if (!isScannerActive) return;
           handleScanResult(decodedText);
         },
         (errorMessage) => {
-          if (errorMessage.includes("No QR code found") || errorMessage.includes("QR code parse error")) {
+          // Filter benign errors
+          if (QR_SCANNER_BENIGN_ERROR_NAMES.some(err => errorMessage.includes(err))) {
             return;
           }
           console.warn("QR Scanner error:", errorMessage);
@@ -677,67 +724,64 @@ export default function TeacherDashboard() {
       console.log("QR scanner started successfully");
     } catch (error) {
       console.error("Failed to start QR scanner:", error);
-
-      let errorMessage = `Camera error: ${error.message || 'Failed to access camera'}`;
-
-      if (error.message && error.message.includes('secure context')) {
-        const currentUrl = window.location.href;
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-        if (isLocalhost) {
-          errorMessage = "Camera requires HTTPS. Please use 'npm run dev' instead of 'npm run dev-http' for HTTPS support.";
-        } else {
-          errorMessage = `Camera access requires HTTPS on mobile devices. Current URL: ${currentUrl}
-
-Solutions:
-1. Use ngrok: Run 'npm run dev-mobile' on your computer, then use the HTTPS URL from ngrok
-2. Enable camera on HTTP: In Chrome mobile, go to Settings > Site Settings > Camera > Add exception for this site
-3. Use localhost: Access via http://localhost:3000 if on the same device`;
-        }
-      } else if (error.name === "NotAllowedError") {
-        errorMessage = "Camera access denied. Please grant camera permission and reload the page.";
-      } else if (error.name === "NotReadableError") {
-        errorMessage = "Camera is busy or not available. Please close other apps using the camera and try again.";
-      } else if (error.name === "NotSupportedError") {
-        errorMessage = "Camera is not supported on this device or browser.";
-      }
-
-      setCameraError(errorMessage);
+      setCameraError(`Camera error: ${error.message || 'Failed to access camera'}`);
       setScannerStatus("error");
       html5QrCodeRef.current = null;
-    }
-    finally {
+    } finally {
       isStartingRef.current = false;
     }
-  }, [isScannerActive, handleScanResult, selectedDeviceId, isMobileDevice]);
+  }, [isScannerActive, handleScanResult, isMobileDevice]);
 
   const stopScannerOnly = useCallback(async () => {
     if (!html5QrCodeRef.current) return;
     if (isStoppingRef.current) return;
-    const scanner = html5QrCodeRef.current;
+    
     try {
       isStoppingRef.current = true;
+      console.log('Stopping QR scanner...');
+      
+      // Clear any pending restart timers
       if (restartTimerRef.current) {
         clearTimeout(restartTimerRef.current);
         restartTimerRef.current = null;
       }
+      
+      const scanner = html5QrCodeRef.current;
+      
       try {
+        // Try the standard stop method
         await scanner.stop();
+        console.log('Scanner stopped via standard method');
       } catch (e) {
-        console.warn('scanner.stop() failed, continuing with manual track stop', e);
+        console.warn('Standard stop() failed, using manual track cleanup', e);
+        
+        // More aggressive approach to stop all video tracks
         try {
+          // Find all video elements in the scanner container
           const container = document.getElementById('qr-code-scanner');
           if (container) {
+            // Stop all video tracks directly
             const videos = container.querySelectorAll('video');
             videos.forEach((video) => {
               if (video.srcObject) {
                 const tracks = video.srcObject.getTracks();
-                tracks.forEach((track) => track.stop());
+                tracks.forEach((track) => {
+                  track.stop();
+                  console.log('Manually stopped track:', track.id);
+                });
                 video.srcObject = null;
+                video.pause();
               }
             });
+            
+            // Also try to find any tracks directly from MediaDevices
+            navigator.mediaDevices?.getTracks?.().forEach(track => {
+              track.stop();
+            });
           }
-        } catch {}
+        } catch (trackError) {
+          console.error('Failed to manually stop tracks:', trackError);
+        }
       }
     } finally {
       isStoppingRef.current = false;
@@ -749,16 +793,38 @@ Solutions:
       setScannerStatus("idle");
       return;
     }
-    const scanner = html5QrCodeRef.current;
+    
     try {
-      console.log('Tearing down QR scanner...');
+      console.log('Tearing down QR scanner completely...');
+      
+      // First stop all scanning operations
       await stopScannerOnly();
+      
+      const scanner = html5QrCodeRef.current;
+      
+      // Then try to clear the HTML5QrCode instance
       try {
         await scanner.clear();
+        console.log('Scanner cleared successfully');
       } catch (e) {
-        console.warn('scanner.clear() failed, continuing', e);
+        console.warn('Scanner clear() failed:', e);
+        
+        // More aggressive approach to clear the scanner DOM
+        try {
+          const container = document.getElementById('qr-code-scanner');
+          if (container) {
+            // Clear all child elements
+            while (container.firstChild) {
+              container.removeChild(container.firstChild);
+            }
+            console.log('Manually cleared scanner DOM');
+          }
+        } catch (clearError) {
+          console.error('Failed manual DOM cleanup:', clearError);
+        }
       }
     } finally {
+      // Make sure we null out the reference
       html5QrCodeRef.current = null;
       setScannerStatus("idle");
       console.log('QR scanner teardown completed');
@@ -768,6 +834,15 @@ Solutions:
   const switchToDevice = useCallback(async (deviceId) => {
     if (!deviceId) return;
     desiredDeviceIdRef.current = deviceId;
+
+    // For mobile devices, fully teardown and restart the scanner
+    if (isMobileDevice) {
+      await teardownScanner();
+      setSelectedDeviceId(deviceId);
+      await startQrScanner();
+      return;
+    }
+
     if (!html5QrCodeRef.current) {
       setSelectedDeviceId(deviceId);
       return;
@@ -789,10 +864,6 @@ Solutions:
         qrbox: { width: 200, height: 200 },
         aspectRatio: 1.0,
         disableFlip: false,
-        videoConstraints: {
-          width: { min: 640, ideal: 1280, max: 1920 },
-          height: { min: 480, ideal: 720, max: 1080 }
-        }
       };
 
       await scanner.start(
@@ -803,19 +874,16 @@ Solutions:
           handleScanResult(decodedText);
         },
         (errorMessage) => {
-          if (errorMessage.includes("No QR code found") || errorMessage.includes("QR code parse error")) {
-            return;
-          }
-          console.warn("QR Scanner error:", errorMessage);
+          // Ignore QR scanning errors
         }
       );
 
       setSelectedDeviceId(deviceId);
       setScannerStatus("ready");
-      console.log('Switched camera successfully');
+      console.log("Switched camera successfully");
     } catch (error) {
-      console.error('Failed to switch camera', error);
-      toast.error('Unable to switch camera');
+      console.error("Failed to switch camera", error);
+      toast.error("Unable to switch camera");
       try {
         const scanner = html5QrCodeRef.current;
         if (scanner) {
@@ -833,24 +901,105 @@ Solutions:
             },
             () => {}
           );
-          setScannerStatus('ready');
+          setScannerStatus("ready");
         }
       } catch {}
     } finally {
       isSwitchingRef.current = false;
     }
-  }, [handleScanResult, isMobileDevice]);
+  }, [handleScanResult, isMobileDevice, teardownScanner, stopScannerOnly, startQrScanner]);
 
   const cycleCameraReal = useCallback(async () => {
     if (cameraDevices.length < 2) return;
-    const currentIndex = cameraDevices.findIndex((d) => d.deviceId === selectedDeviceId);
-    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % cameraDevices.length;
-    const nextDevice = cameraDevices[nextIndex];
-    await switchToDevice(nextDevice.deviceId);
-  }, [cameraDevices, selectedDeviceId, switchToDevice]);
+    
+    try {
+      setScannerStatus("loading");
+      
+      // Get fresh camera list with current permissions
+      await navigator.mediaDevices.getUserMedia({video: true});
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const freshCameras = devices.filter(d => d.kind === 'videoinput');
+      
+      // Enhanced camera info for logging
+      const enhancedCameras = freshCameras.map((device, index) => ({
+        deviceId: device.deviceId,
+        label: device.label || `Camera ${index+1}`,
+        isBack: device.label && /back|rear|environment/i.test(device.label),
+        isFront: device.label && /front|face|user/i.test(device.label),
+        index
+      }));
+      
+      console.log("Camera switching - available cameras:", enhancedCameras.map(d => 
+        `${d.label} (${d.isBack ? 'BACK' : d.isFront ? 'FRONT' : 'UNKNOWN'})`));
+      
+      // Find current camera index
+      const currentIndex = freshCameras.findIndex(d => d.deviceId === selectedDeviceId);
+      console.log("Current camera index:", currentIndex, "deviceId:", selectedDeviceId);
+      
+      // Simple next index selection
+      const nextIndex = (currentIndex + 1) % freshCameras.length;
+      const nextCamera = freshCameras[nextIndex];
+      
+      // Always completely teardown and rebuild for consistent behavior
+      await teardownScanner();
+      
+      // Set both state and ref in sync
+      desiredDeviceIdRef.current = nextCamera.deviceId;
+      setSelectedDeviceId(nextCamera.deviceId);
+      
+      console.log(`Switching to camera ${nextIndex}: ${nextCamera.label || 'Unlabeled camera'}`);
+      
+      // Wait a moment for state to update
+      await new Promise(r => setTimeout(r, 100));
+      
+      // Start with the new camera
+      await startQrScanner();
+      
+      const cameraType = nextCamera.label && /back|rear|environment/i.test(nextCamera.label) 
+        ? "back camera"
+        : nextCamera.label && /front|face|user/i.test(nextCamera.label)
+        ? "front camera" 
+        : "camera";
+        
+      toast.success(`Switched to ${cameraType}`);
+      
+    } catch (error) {
+      console.error("Camera switch failed:", error);
+      toast.error("Failed to switch camera");
+      
+      // Recovery
+      await startQrScanner();
+    }
+  }, [cameraDevices, selectedDeviceId, teardownScanner, startQrScanner]);
 
+const handleStopScanner = async () => {
+  // Set state first to prevent any new scans
+  setIsScannerActive(false);
+  isScannerActiveRef.current = false;
   
-  useEffect(() => { (cycleCamera).toString(); });
+  // Completely teardown the scanner
+  await teardownScanner();
+  
+  // Clear all related state
+  setCameraDevices([]);
+  setSelectedDeviceId(null);
+  setActiveRecord(null);
+  setScannedStudents(new Map());
+  processedQrsRef.current.clear();
+  lastQrRef.current = null;
+  lastQrTimeRef.current = 0;
+  setScannerStatus("idle");
+  setCameraError(null);
+  
+  // Attempt to clean up any remaining camera resources
+  try {
+    // This extra step ensures all tracks are stopped
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: false });
+      stream.getTracks().forEach(track => track.stop());
+    }
+  } catch {}
+};
 
   useEffect(() => {
     if (isScannerActive && !html5QrCodeRef.current) {
@@ -990,7 +1139,7 @@ Solutions:
               <div
                 className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-inner w-full"
                 style={{ 
-                  aspectRatio: "4 / 3", 
+                  aspectRatio: "1 / 1", 
                   minHeight: "240px",
                   maxHeight: "400px",
                   maxWidth: "100%"
@@ -1027,9 +1176,7 @@ Solutions:
                     <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-emerald-400"></div>
                     <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-emerald-400"></div>
                     <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-emerald-400"></div>
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-emerald-200 text-xs font-medium bg-slate-950/70 px-2 py-1 rounded">
-                      Ready to scan QR codes
-                    </div>
+                    
                   </div>
                 )}
               </div>
@@ -1079,20 +1226,7 @@ Solutions:
             <div className="mt-4">
               <button
                 type="button"
-                onClick={async () => {
-                  
-                  setIsScannerActive(false);
-                  await teardownScanner();
-                  setCameraDevices([]);
-                  setSelectedDeviceId(null);
-                  setActiveRecord(null);
-                  setScannedStudents(new Map());
-                  processedQrsRef.current.clear();
-                  lastQrRef.current = null;
-                  lastQrTimeRef.current = 0;
-                  setScannerStatus("idle");
-                  setCameraError(null);
-                }}
+                onClick={handleStopScanner}
                 className="inline-flex w-full items-center justify-center rounded-full border border-red-400/50 px-6 py-3 text-sm font-medium text-red-200 transition hover:border-red-400 hover:bg-red-500/10 hover:text-white"
               >
                 Stop Scanner
@@ -1579,10 +1713,6 @@ Solutions:
                             className="inline-flex items-center gap-2 rounded-full bg-emerald-400/90 px-4 py-2 text-xs font-semibold text-emerald-950"
                           >
                             Start scanner
-
-
-
-
                           </button>
                         ) : (
                           <button
