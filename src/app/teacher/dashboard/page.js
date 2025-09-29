@@ -48,6 +48,17 @@ function formatDate(value) {
   }).format(date);
 }
 
+function formatDateOnly(value) {
+  if (!value) return "Unknown";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+  }).format(date);
+}
+
 function makeExportFilename(record, extension) {
   const base = `${record.className || "class"}-${record.recordName || "session"}`
     .replace(/[^a-z0-9]+/gi, "-")
@@ -76,6 +87,10 @@ export default function TeacherDashboard() {
   const [scannedStudents, setScannedStudents] = useState(new Map());
   const [selectedTeacher, setSelectedTeacher] = useState("all");
   const [adminTab, setAdminTab] = useState("analytics");
+  const [analyticsClassFilter, setAnalyticsClassFilter] = useState("all");
+  const [analyticsRecordFilter, setAnalyticsRecordFilter] = useState("all");
+  const [graphStartDate, setGraphStartDate] = useState("");
+  const [graphEndDate, setGraphEndDate] = useState("");
   const [invites, setInvites] = useState([]);
   const [accessRequests, setAccessRequests] = useState([]);
   const [loadingAdminData, setLoadingAdminData] = useState(false);
@@ -94,6 +109,10 @@ export default function TeacherDashboard() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [scannerStatus, setScannerStatus] = useState("idle");
   const isAdmin = auth?.teacher.role === "admin";
+  const teacherDisplayName =
+    auth?.teacher?.name?.trim() || auth?.teacher?.email || "";
+  const teacherDisplayEmail =
+    auth?.teacher?.name?.trim() ? auth?.teacher?.email : "";
   
   const html5QrCodeRef = useRef(null);
   const scannerElementRef = useRef(null);
@@ -153,24 +172,61 @@ export default function TeacherDashboard() {
     refreshRecords();
   }, [auth, selectedTeacher, refreshRecords]);
 
+  const teacherMap = useMemo(() => {
+    const map = new Map();
+    teachers.forEach((teacher) => {
+      if (teacher?.teacherId) {
+        map.set(teacher.teacherId, teacher);
+      }
+    });
+    return map;
+  }, [teachers]);
+
   const uniqueTeachers = useMemo(() => {
-    if (!records?.length) return [];
-    const ids = new Map();
-    records.forEach((group) => {
-      group.records.forEach((record) => {
-        ids.set(record.teacherId, true);
+    const lookup = new Map();
+
+    teachers.forEach((teacher) => {
+      if (!teacher?.teacherId) return;
+      lookup.set(teacher.teacherId, {
+        teacherId: teacher.teacherId,
+        name:
+          teacher.name?.trim() || teacher.email?.trim() || teacher.teacherId,
+        email: teacher.email || "",
+        role: teacher.role || "teacher",
       });
     });
-    return Array.from(ids.keys());
-  }, [records]);
+
+    records?.forEach((group) => {
+      group.records.forEach((record) => {
+        const id = record.teacherId;
+        if (!id || lookup.has(id)) return;
+        lookup.set(id, {
+          teacherId: id,
+          name:
+            record.teacherName?.trim() || record.teacherEmail || id,
+          email: record.teacherEmail || "",
+          role: teacherMap.get(id)?.role || "teacher",
+        });
+      });
+    });
+
+    return Array.from(lookup.values()).sort((a, b) => {
+      const aName = a.name || a.teacherId;
+      const bName = b.name || b.teacherId;
+      return aName.localeCompare(bName, undefined, { sensitivity: "base" });
+    });
+  }, [records, teachers, teacherMap]);
 
   const analytics = useMemo(() => {
     const summary = {
       totalSessions: 0,
       totalAttendees: 0,
       uniqueStudents: 0,
+      classSummaries: [],
       topClasses: [],
-      teacherAttendance: [],
+      teacherActivity: [],
+      minDateIso: "",
+      maxDateIso: "",
     };
 
     if (!records?.length) {
@@ -178,46 +234,414 @@ export default function TeacherDashboard() {
     }
 
     const studentIds = new Set();
-    const classCounts = new Map();
-    const teacherCounts = new Map();
+    const classMap = new Map();
+    let minTimestamp = null;
+    let maxTimestamp = null;
 
     records.forEach((group) => {
-      group.records.forEach((record) => {
-        summary.totalSessions += 1;
-        summary.totalAttendees += record.attendees.length;
+      const className = group.className?.trim() || "Class";
+      if (!group?.records?.length) {
+        return;
+      }
 
-        record.attendees.forEach((student) => {
-          if (student.studentId) {
-            studentIds.add(student.studentId);
+      let classEntry = classMap.get(className);
+      if (!classEntry) {
+        classEntry = {
+          className,
+          totalSessions: 0,
+          totalAttendees: 0,
+          records: new Map(),
+          teachers: new Map(),
+        };
+        classMap.set(className, classEntry);
+      }
+
+      group.records.forEach((record) => {
+        const attendees = Array.isArray(record.attendees)
+          ? record.attendees
+          : [];
+        const attendeeCount = attendees.length;
+
+        summary.totalSessions += 1;
+        summary.totalAttendees += attendeeCount;
+        classEntry.totalSessions += 1;
+        classEntry.totalAttendees += attendeeCount;
+
+        attendees.forEach((student) => {
+          const id =
+            student?.studentId ?? student?.id ?? student?.qrId ?? null;
+          if (id) {
+            studentIds.add(String(id));
           }
         });
 
-        const classKey = record.className || group.className || "Class";
-        classCounts.set(
-          classKey,
-          (classCounts.get(classKey) || 0) + record.attendees.length
-        );
+        if (record.createdAt) {
+          const timestamp = Date.parse(record.createdAt);
+          if (!Number.isNaN(timestamp)) {
+            if (minTimestamp === null || timestamp < minTimestamp) {
+              minTimestamp = timestamp;
+            }
+            if (maxTimestamp === null || timestamp > maxTimestamp) {
+              maxTimestamp = timestamp;
+            }
+          }
+        }
 
-        const teacherKey = record.teacherId || "unknown";
-        teacherCounts.set(
-          teacherKey,
-          (teacherCounts.get(teacherKey) || 0) + record.attendees.length
-        );
+        const recordKey =
+          record.recordId ||
+          `${classEntry.className}::${record.recordName || "Session"}`;
+        let recordEntry = classEntry.records.get(recordKey);
+        const teacherId = record.teacherId || null;
+        const teacherInfo = teacherId ? teacherMap.get(teacherId) : undefined;
+        if (!recordEntry) {
+          recordEntry = {
+            recordId: record.recordId || recordKey,
+            recordName: record.recordName || "Session",
+            attendeeCount: 0,
+            createdAt: record.createdAt || null,
+            teacherId: teacherId,
+            teacherName:
+              record.teacherName?.trim() ||
+              teacherInfo?.name?.trim() ||
+              "",
+            teacherEmail: record.teacherEmail || teacherInfo?.email || "",
+          };
+          classEntry.records.set(recordKey, recordEntry);
+        }
+
+        recordEntry.attendeeCount += attendeeCount;
+        if (record.createdAt) {
+          if (!recordEntry.createdAt) {
+            recordEntry.createdAt = record.createdAt;
+          } else {
+            const existingTimestamp = Date.parse(recordEntry.createdAt);
+            const nextTimestamp = Date.parse(record.createdAt);
+            if (
+              !Number.isNaN(nextTimestamp) &&
+              (Number.isNaN(existingTimestamp) || nextTimestamp > existingTimestamp)
+            ) {
+              recordEntry.createdAt = record.createdAt;
+            }
+          }
+        }
+        if (!recordEntry.teacherName?.trim()) {
+          recordEntry.teacherName =
+            record.teacherName?.trim() ||
+            teacherInfo?.name?.trim() ||
+            recordEntry.teacherName ||
+            "";
+        }
+        if (!recordEntry.teacherEmail) {
+          recordEntry.teacherEmail =
+            record.teacherEmail || teacherInfo?.email || recordEntry.teacherEmail;
+        }
+        if (!recordEntry.teacherId && teacherId) {
+          recordEntry.teacherId = teacherId;
+        }
+
+        const teacherKey = teacherId || "unknown";
+        let teacherEntry = classEntry.teachers.get(teacherKey);
+        const teacherFallback = teacherId ? teacherMap.get(teacherId) : undefined;
+        if (!teacherEntry) {
+          teacherEntry = {
+            teacherId: teacherKey,
+            teacherName:
+              record.teacherName?.trim() ||
+              teacherFallback?.name?.trim() ||
+              (teacherKey === "unknown" ? "Unknown" : teacherKey),
+            teacherEmail: record.teacherEmail || teacherFallback?.email || "",
+            sessionCount: 0,
+            attendeeCount: 0,
+          };
+          classEntry.teachers.set(teacherKey, teacherEntry);
+        }
+
+        teacherEntry.sessionCount += 1;
+        teacherEntry.attendeeCount += attendeeCount;
+
+        if (
+          (!teacherEntry.teacherName || teacherEntry.teacherName === "Unknown") &&
+          record.teacherName?.trim()
+        ) {
+          teacherEntry.teacherName = record.teacherName.trim();
+        }
+        if (!teacherEntry.teacherEmail && record.teacherEmail) {
+          teacherEntry.teacherEmail = record.teacherEmail;
+        }
       });
     });
 
     summary.uniqueStudents = studentIds.size;
-    summary.topClasses = Array.from(classCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([name, count]) => ({ name, count }));
 
-    summary.teacherAttendance = Array.from(teacherCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([teacherId, count]) => ({ teacherId, count }));
+    const classSummaries = Array.from(classMap.values()).map((classEntry) => {
+      const recordsByDate = Array.from(classEntry.records.values()).sort(
+        (a, b) => {
+          const dateA = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
+          const dateB = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
+
+          if (!Number.isNaN(dateA) && !Number.isNaN(dateB)) {
+            return dateB - dateA;
+          }
+          if (!Number.isNaN(dateA)) return -1;
+          if (!Number.isNaN(dateB)) return 1;
+          return (a.recordName || "").localeCompare(b.recordName || "");
+        }
+      );
+
+      const recordsByAttendance = recordsByDate
+        .slice()
+        .sort((a, b) => {
+          if (b.attendeeCount !== a.attendeeCount) {
+            return b.attendeeCount - a.attendeeCount;
+          }
+          return (a.recordName || "").localeCompare(b.recordName || "");
+        });
+
+      const teacherList = Array.from(classEntry.teachers.values()).sort(
+        (a, b) => {
+          if (b.attendeeCount !== a.attendeeCount) {
+            return b.attendeeCount - a.attendeeCount;
+          }
+          if (b.sessionCount !== a.sessionCount) {
+            return b.sessionCount - a.sessionCount;
+          }
+          return (a.teacherName || a.teacherId || "").localeCompare(
+            b.teacherName || b.teacherId || ""
+          );
+        }
+      );
+
+      const primaryTeacher = teacherList[0] || null;
+
+      return {
+        className: classEntry.className,
+        totalSessions: classEntry.totalSessions,
+        totalAttendees: classEntry.totalAttendees,
+        records: recordsByDate,
+        recordsByAttendance,
+        teacherList,
+        primaryTeacher,
+      };
+    });
+
+    summary.classSummaries = classSummaries;
+    summary.topClasses = classSummaries
+      .slice()
+      .sort((a, b) => b.totalAttendees - a.totalAttendees);
+
+    summary.teacherActivity = classSummaries
+      .map((cls) => ({
+        className: cls.className,
+        primaryTeacher: cls.primaryTeacher,
+        additionalTeachers: cls.teacherList.slice(1),
+        totalSessions: cls.totalSessions,
+        totalAttendees: cls.totalAttendees,
+      }))
+      .sort((a, b) => b.totalAttendees - a.totalAttendees);
+
+    summary.minDateIso = minTimestamp
+      ? new Date(minTimestamp).toISOString().slice(0, 10)
+      : "";
+    summary.maxDateIso = maxTimestamp
+      ? new Date(maxTimestamp).toISOString().slice(0, 10)
+      : "";
 
     return summary;
-  }, [records]);
+  }, [records, teacherMap]);
+
+  useEffect(() => {
+    setAnalyticsRecordFilter("all");
+  }, [analyticsClassFilter]);
+
+  useEffect(() => {
+    if (!analytics.minDateIso || !analytics.maxDateIso) {
+      return;
+    }
+
+    setGraphStartDate((prev) => {
+      if (!prev) return analytics.minDateIso;
+      if (prev < analytics.minDateIso) return analytics.minDateIso;
+      if (prev > analytics.maxDateIso) return analytics.maxDateIso;
+      return prev;
+    });
+
+    setGraphEndDate((prev) => {
+      if (!prev) return analytics.maxDateIso;
+      if (prev > analytics.maxDateIso) return analytics.maxDateIso;
+      if (prev < analytics.minDateIso) return analytics.minDateIso;
+      return prev;
+    });
+  }, [analytics.minDateIso, analytics.maxDateIso]);
+
+  useEffect(() => {
+    if (analyticsClassFilter === "all" || analyticsRecordFilter === "all") {
+      return;
+    }
+
+    const classSummary = analytics.classSummaries.find(
+      (cls) => cls.className === analyticsClassFilter
+    );
+    const hasRecord = classSummary?.recordsByAttendance?.some(
+      (record) => record.recordId === analyticsRecordFilter
+    );
+    if (!hasRecord) {
+      setAnalyticsRecordFilter("all");
+    }
+  }, [
+    analytics.classSummaries,
+    analyticsClassFilter,
+    analyticsRecordFilter,
+  ]);
+
+  const recordOptions = useMemo(() => {
+    if (analyticsClassFilter === "all") {
+      return [];
+    }
+
+    const classSummary = analytics.classSummaries.find(
+      (cls) => cls.className === analyticsClassFilter
+    );
+    if (!classSummary) {
+      return [];
+    }
+
+    return classSummary.recordsByAttendance.map((record) => ({
+      value: record.recordId,
+      label: record.recordName,
+    }));
+  }, [analytics.classSummaries, analyticsClassFilter]);
+
+  const filteredTopClasses = useMemo(() => {
+    if (!analytics.topClasses.length) {
+      return [];
+    }
+
+    if (analyticsClassFilter === "all") {
+      return analytics.topClasses.slice(0, 5).map((cls) => ({
+        className: cls.className,
+        totalAttendees: cls.totalAttendees,
+        records:
+          analyticsRecordFilter === "all"
+            ? cls.recordsByAttendance.slice(0, 3)
+            : cls.recordsByAttendance.filter(
+                (record) => record.recordId === analyticsRecordFilter
+              ),
+      }));
+    }
+
+    const classSummary = analytics.classSummaries.find(
+      (cls) => cls.className === analyticsClassFilter
+    );
+    if (!classSummary) {
+      return [];
+    }
+
+    const records =
+      analyticsRecordFilter === "all"
+        ? classSummary.recordsByAttendance
+        : classSummary.recordsByAttendance.filter(
+            (record) => record.recordId === analyticsRecordFilter
+          );
+
+    return [
+      {
+        className: classSummary.className,
+        totalAttendees: classSummary.totalAttendees,
+        records,
+      },
+    ];
+  }, [
+    analytics.topClasses,
+    analytics.classSummaries,
+    analyticsClassFilter,
+    analyticsRecordFilter,
+  ]);
+
+  const attendanceGraph = useMemo(() => {
+    if (!graphStartDate || !graphEndDate) {
+      return {
+        rangeProvided: false,
+        rangeValid: false,
+        hasData: false,
+        classes: [],
+        maxCount: 0,
+      };
+    }
+
+    if (graphStartDate > graphEndDate) {
+      return {
+        rangeProvided: true,
+        rangeValid: false,
+        hasData: false,
+        classes: [],
+        maxCount: 0,
+      };
+    }
+
+    const rangeStart = Date.parse(`${graphStartDate}T00:00:00`);
+    const rangeEnd = Date.parse(`${graphEndDate}T23:59:59.999`);
+    if (Number.isNaN(rangeStart) || Number.isNaN(rangeEnd)) {
+      return {
+        rangeProvided: true,
+        rangeValid: false,
+        hasData: false,
+        classes: [],
+        maxCount: 0,
+      };
+    }
+
+    let runningMax = 0;
+
+    const classes = analytics.classSummaries
+      .map((cls) => {
+        const recordsInRange = cls.records
+          .filter((record) => {
+            if (!record.createdAt) return false;
+            const timestamp = Date.parse(record.createdAt);
+            if (Number.isNaN(timestamp)) {
+              return false;
+            }
+            return timestamp >= rangeStart && timestamp <= rangeEnd;
+          })
+          .map((record) => ({ ...record }));
+
+        if (recordsInRange.length === 0) {
+          return null;
+        }
+
+        const sortedRecords = recordsInRange.sort((a, b) => {
+          const dateA = a.createdAt ? Date.parse(a.createdAt) : 0;
+          const dateB = b.createdAt ? Date.parse(b.createdAt) : 0;
+          return dateA - dateB;
+        });
+
+        sortedRecords.forEach((record) => {
+          if (record.attendeeCount > runningMax) {
+            runningMax = record.attendeeCount;
+          }
+        });
+
+        const totalAttendees = sortedRecords.reduce(
+          (sum, record) => sum + record.attendeeCount,
+          0
+        );
+
+        return {
+          className: cls.className,
+          totalAttendees,
+          records: sortedRecords,
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      rangeProvided: true,
+      rangeValid: true,
+      hasData: classes.length > 0,
+      classes,
+      maxCount: runningMax,
+    };
+  }, [analytics.classSummaries, graphStartDate, graphEndDate]);
 
   const activeInviteCount = useMemo(
     () => invites.filter((invite) => invite.status === "active").length,
@@ -540,6 +964,7 @@ export default function TeacherDashboard() {
       setActiveRecord({
         ...data.record,
         teacherId: auth.teacher.teacherId,
+        teacherName: teacherDisplayName,
       });
       setIsScannerActive(true);
       setShowCreate(false);
@@ -1038,7 +1463,12 @@ const handleStopScanner = async () => {
             Attendance dashboard
           </h1>
           <p className="mt-1 text-sm text-slate-300">
-            Signed in as {auth.teacher.email} · role: {auth.teacher.role}
+            Signed in as {teacherDisplayName || auth.teacher.email}
+            {teacherDisplayEmail ? (
+              <span className="text-slate-400"> ({teacherDisplayEmail})</span>
+            ) : null}
+            {" · role: "}
+            {auth.teacher.role}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -1049,9 +1479,10 @@ const handleStopScanner = async () => {
               className="rounded-full border border-white/10 bg-slate-900/70 px-4 py-2 text-sm text-white outline-none"
             >
               <option value="all">All teachers</option>
-              {uniqueTeachers.map((id) => (
-                <option key={id} value={id}>
-                  {id}
+              {uniqueTeachers.map((teacher) => (
+                <option key={teacher.teacherId} value={teacher.teacherId}>
+                  {teacher.name}
+                  {teacher.email ? ` · ${teacher.email}` : ""}
                 </option>
               ))}
             </select>
@@ -1341,54 +1772,291 @@ const handleStopScanner = async () => {
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                    Top classes by attendance
-                  </h3>
+                  <div className="flex flex-col gap-4 sm:flex-col sm:items-start sm:justify-between">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+                      Top classes by attendance
+                    </h3>
+                    <div className="flex flex-wrap gap-4 text-xs sm:text-sm">
+                      <label className="flex flex-col gap-1">
+                        <span className="font-semibold uppercase tracking-wide text-slate-500">
+                          Class filter
+                        </span>
+                        <select
+                          value={analyticsClassFilter}
+                          onChange={(event) => setAnalyticsClassFilter(event.target.value)}
+                          className="rounded-xl border min-w-64 border-white/10 bg-slate-900/70 px-3 py-2 text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/20"
+                        >
+                          <option value="all">All classes</option>
+                          {analytics.classSummaries.map((cls) => (
+                            <option key={cls.className} value={cls.className}>
+                              {cls.className}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="font-semibold uppercase tracking-wide text-slate-500">
+                          Record filter
+                        </span>
+                        <select
+                          value={analyticsRecordFilter}
+                          onChange={(event) => setAnalyticsRecordFilter(event.target.value)}
+                          disabled={
+                            analyticsClassFilter === "all" || recordOptions.length === 0
+                          }
+                          className="rounded-xl border min-w-32 border-white/10 bg-slate-900/70 px-3 py-2 text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="all">All records</option>
+                          {recordOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
                   <ul className="mt-4 space-y-3 text-sm text-slate-200">
-                    {analytics.topClasses.length === 0 && (
+                    {filteredTopClasses.length === 0 && (
                       <li className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
                         No attendance records yet.
                       </li>
                     )}
-                    {analytics.topClasses.map((entry, index) => (
+                    {filteredTopClasses.map((entry, index) => (
                       <li
-                        key={entry.name}
-                        className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+                        key={entry.className || index}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"
                       >
-                        <span className="font-medium text-white">
-                          {index + 1}. {entry.name}
-                        </span>
-                        <span className="text-xs text-slate-300">
-                          {entry.count} scans
-                        </span>
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="font-medium text-white">
+                            {analyticsClassFilter === "all" ? `${index + 1}. ` : ""}
+                            {entry.className}
+                          </span>
+                          <span className="text-xs text-slate-300">
+                            {entry.totalAttendees} students
+                          </span>
+                        </div>
+                        {entry.records.length > 0 && (
+                          <ul className="mt-3 space-y-2 text-xs text-slate-300">
+                            {entry.records.map((record) => (
+                              <li
+                                key={record.recordId}
+                                className="flex flex-col gap-1 rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <span className="font-medium text-white">
+                                    {record.recordName}
+                                  </span>
+                                  <span className="text-[11px] text-slate-300">
+                                    {record.attendeeCount} students
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                                  {record.teacherName ? (
+                                    <span>
+                                      Teacher: {record.teacherName}
+                                      {record.teacherEmail
+                                        ? ` · ${record.teacherEmail}`
+                                        : ""}
+                                    </span>
+                                  ) : null}
+                                  {record.createdAt ? (
+                                    <span>
+                                      {formatDateOnly(record.createdAt)}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </li>
                     ))}
                   </ul>
                 </div>
                 <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                    Teacher activity leaderboard
+                    Classes
                   </h3>
                   <ul className="mt-4 space-y-3 text-sm text-slate-200">
-                    {analytics.teacherAttendance.length === 0 && (
+                    {analytics.teacherActivity.length === 0 && (
                       <li className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
                         No data captured yet.
                       </li>
                     )}
-                    {analytics.teacherAttendance.slice(0, 5).map((entry, index) => (
-                      <li
-                        key={entry.teacherId || index}
-                        className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-                      >
-                        <span className="font-medium text-white">
-                          {index + 1}. {entry.teacherId}
-                        </span>
-                        <span className="text-xs text-slate-300">
-                          {entry.count} scans
-                        </span>
-                      </li>
-                    ))}
+                    {analytics.teacherActivity.slice(0, 6).map((entry, index) => {
+                      const primary = entry.primaryTeacher;
+                      const primaryDisplay = primary
+                        ? primary.teacherName?.trim() ||
+                          primary.teacherEmail ||
+                          primary.teacherId ||
+                          "Unknown"
+                        : "Unknown";
+                      const secondaryDisplay = entry.additionalTeachers
+                        .map((teacher) =>
+                          teacher.teacherName?.trim() ||
+                          teacher.teacherEmail ||
+                          teacher.teacherId ||
+                          "Unknown"
+                        )
+                        .slice(0, 2);
+
+                      return (
+                        <li
+                          key={entry.className || index}
+                          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="font-medium text-white">
+                              {index + 1}. {entry.className}
+                            </span>
+                            <span className="text-xs text-slate-300">
+                              {entry.totalAttendees} students
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-1 text-xs text-slate-300">
+                            <p>
+                              Lead teacher: <span className="text-white">{primaryDisplay}</span>
+                              {primary?.teacherEmail && primary.teacherEmail !== primaryDisplay
+                                ? ` · ${primary.teacherEmail}`
+                                : ""}
+                            </p>
+                            {secondaryDisplay.length > 0 && (
+                              <p className="text-[11px] text-slate-400">
+                                Additional: {secondaryDisplay.join(", ")}
+                                {entry.additionalTeachers.length > secondaryDisplay.length
+                                  ? "…"
+                                  : ""}
+                              </p>
+                            )}
+                            <p className="text-[11px] text-slate-400">
+                              Sessions: {entry.totalSessions}
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+                      Attendance trends by record
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-300">
+                      Student counts per record grouped by class within the selected date range (inclusive).
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-xs sm:text-sm">
+                    <label className="flex flex-col gap-1">
+                      <span className="font-semibold uppercase tracking-wide text-slate-500">
+                        From date
+                      </span>
+                      <input
+                        type="date"
+                        value={graphStartDate}
+                        onChange={(event) => setGraphStartDate(event.target.value)}
+                        min={analytics.minDateIso || undefined}
+                        max={analytics.maxDateIso || undefined}
+                        className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/20"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="font-semibold uppercase tracking-wide text-slate-500">
+                        To date
+                      </span>
+                      <input
+                        type="date"
+                        value={graphEndDate}
+                        onChange={(event) => setGraphEndDate(event.target.value)}
+                        min={analytics.minDateIso || undefined}
+                        max={analytics.maxDateIso || undefined}
+                        className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/20"
+                      />
+                    </label>
+                  </div>
+                </div>
+                <div className="mt-6 space-y-6">
+                  {!attendanceGraph.rangeProvided && (
+                    <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
+                      Select a start and end date to generate the graph.
+                    </div>
+                  )}
+                  {attendanceGraph.rangeProvided && !attendanceGraph.rangeValid && (
+                    <div className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-6 text-center text-red-200">
+                      Invalid date range. Ensure the start date is on or before the end date.
+                    </div>
+                  )}
+                  {attendanceGraph.rangeProvided &&
+                    attendanceGraph.rangeValid &&
+                    !attendanceGraph.hasData && (
+                      <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
+                        No records found within the selected range.
+                      </div>
+                    )}
+                  {attendanceGraph.rangeProvided &&
+                    attendanceGraph.rangeValid &&
+                    attendanceGraph.hasData && (
+                      <div className="space-y-6">
+                        {attendanceGraph.classes.map((classEntry) => (
+                          <div
+                            key={classEntry.className}
+                            className="rounded-2xl border border-white/10 bg-slate-900/60 p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <h4 className="text-sm font-semibold text-white">
+                                  {classEntry.className}
+                                </h4>
+                                <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                                  {classEntry.records.length} record{classEntry.records.length === 1 ? "" : "s"}
+                                </p>
+                              </div>
+                              <span className="text-xs text-slate-300">
+                                {classEntry.totalAttendees} students
+                              </span>
+                            </div>
+                            <div className="mt-4 space-y-3">
+                              {classEntry.records.map((record) => {
+                                const widthPercentage = attendanceGraph.maxCount
+                                  ? Math.max(
+                                      6,
+                                      Math.round(
+                                        (record.attendeeCount / attendanceGraph.maxCount) *
+                                          100
+                                      )
+                                    )
+                                  : 0;
+
+                                return (
+                                  <div
+                                    key={`${classEntry.className}-${record.recordId}`}
+                                    className="space-y-1"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
+                                      <span className="font-medium text-white">
+                                        {record.recordName}
+                                      </span>
+                                      <span>
+                                        {formatDateOnly(record.createdAt)} · {record.attendeeCount} students
+                                      </span>
+                                    </div>
+                                    <div className="h-3 w-full rounded-full bg-white/10">
+                                      <div
+                                        className="h-3 rounded-full bg-emerald-400"
+                                        style={{ width: `${widthPercentage}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
@@ -1669,6 +2337,14 @@ const handleStopScanner = async () => {
                         <h4 className="text-lg font-semibold text-white">
                           {record.recordName}
                         </h4>
+                        {(record.teacherName || record.teacherEmail || record.teacherId) && (
+                          <p className="mt-1 text-xs text-slate-400">
+                            Teacher: {record.teacherName || record.teacherEmail || record.teacherId}
+                            {record.teacherName && record.teacherEmail ? (
+                              <span className="text-slate-500"> · {record.teacherEmail}</span>
+                            ) : null}
+                          </p>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-3">
                         <span className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-1 text-xs text-slate-200">

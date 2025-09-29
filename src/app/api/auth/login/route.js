@@ -24,12 +24,14 @@ export async function POST(req) {
       teacherId: teacher.teacherId,
       role: teacher.role,
       email: teacher.email,
+      name: teacher.name,
     });
 
     return NextResponse.json({
       token,
       teacher: {
         teacherId: teacher.teacherId,
+        name: teacher.name,
         email: teacher.email,
         role: teacher.role,
       },

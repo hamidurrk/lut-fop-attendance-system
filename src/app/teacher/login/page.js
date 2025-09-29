@@ -51,9 +51,11 @@ export default function TeacherLoginPage() {
     try {
       const body = {
         ...payload,
+        name: payload.name?.trim(),
+        email: payload.email?.trim(),
         inviteCode: payload.inviteCode?.trim().toUpperCase(),
       };
-  const data = await request("/api/auth/signup", { body });
+      const data = await request("/api/auth/signup", { body });
       localStorage.setItem(
         AUTH_STORAGE_KEY,
         JSON.stringify({ token: data.token, teacher: data.teacher })
@@ -178,6 +180,17 @@ export default function TeacherLoginPage() {
             onSubmit={signupForm.handleSubmit(handleSignup)}
             className="space-y-6"
           >
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-200">
+                Full name
+              </label>
+              <input
+                type="text"
+                placeholder="Aino Virtanen"
+                {...signupForm.register("name", { required: true, minLength: 2 })}
+                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-base text-white outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20"
+              />
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-200">
                 LUT email address

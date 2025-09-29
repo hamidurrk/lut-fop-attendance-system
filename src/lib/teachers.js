@@ -42,15 +42,20 @@ function sanitizeContext(value) {
   return value?.trim() ?? "";
 }
 
+function sanitizeName(value) {
+  return value?.toString().trim() ?? "";
+}
+
 export async function findTeacherByEmail(email) {
   const { rows } = await readRows(teacherSheetName(), TEACHER_HEADERS);
   const lowerEmail = normalizeEmail(email);
 
   for (const row of rows) {
-    const [teacherId, rowEmail, passwordHash, role] = row;
+    const [teacherId, name, rowEmail, passwordHash, role] = row;
     if (rowEmail && rowEmail.trim().toLowerCase() === lowerEmail) {
       return {
         teacherId,
+        name: sanitizeName(name),
         email: rowEmail,
         passwordHash,
         role: role || "teacher",
@@ -61,10 +66,15 @@ export async function findTeacherByEmail(email) {
   return null;
 }
 
-export async function createTeacher({ email, password, role = "teacher" }) {
+export async function createTeacher({ email, password, name, role = "teacher" }) {
   const existing = await findTeacherByEmail(email);
   if (existing) {
     throw new Error("A teacher account with this email already exists.");
+  }
+
+  const cleanName = sanitizeName(name);
+  if (!cleanName) {
+    throw new Error("Name is required to create a teacher account.");
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
@@ -73,11 +83,11 @@ export async function createTeacher({ email, password, role = "teacher" }) {
 
   await appendRow(
     teacherSheetName(),
-    [teacherId, normalizedEmail, passwordHash, role],
+    [teacherId, cleanName, normalizedEmail, passwordHash, role],
     TEACHER_HEADERS
   );
 
-  return { teacherId, email: normalizedEmail, role };
+  return { teacherId, name: cleanName, email: normalizedEmail, role };
 }
 
 export async function verifyTeacherCredentials(email, password) {
@@ -92,6 +102,20 @@ export async function verifyTeacherCredentials(email, password) {
   }
 
   return teacher;
+}
+
+export async function listTeachers() {
+  const { rows, headers } = await readRows(teacherSheetName(), TEACHER_HEADERS);
+  const teachers = rowsToObjects(headers, rows)
+    .filter((entry) => entry.teacher_id)
+    .map((entry) => ({
+      teacherId: entry.teacher_id,
+      name: sanitizeName(entry.name),
+      email: entry.email ?? "",
+      role: entry.role || "teacher",
+    }));
+
+  return teachers;
 }
 
 export async function createInvite({

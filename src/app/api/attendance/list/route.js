@@ -14,9 +14,9 @@ export async function GET(req) {
         ? filterTeacherId
         : token.teacherId;
 
-    const records = await listAttendance({ teacherId, isAdmin });
+  const { records, teachers } = await listAttendance({ teacherId, isAdmin });
 
-    return NextResponse.json({ records });
+  return NextResponse.json({ records, teachers });
   } catch (error) {
     if (error.message === "Missing token") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

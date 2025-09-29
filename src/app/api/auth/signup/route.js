@@ -10,6 +10,7 @@ import { handleError } from "@/lib/apiAuth";
 function validateSignupPayload(body) {
   const errors = [];
   if (!body.email) errors.push("Email is required");
+  if (!body.name || !body.name.trim()) errors.push("Name is required");
   if (!body.password) errors.push("Password is required");
   if (body.password && body.password.length < 8)
     errors.push("Password must be at least 8 characters long");
@@ -25,7 +26,7 @@ export async function POST(req) {
       return NextResponse.json({ errors }, { status: 400 });
     }
 
-    const { email, password, inviteCode } = body;
+    const { email, name, password, inviteCode } = body;
     if (!inviteCode) {
       return NextResponse.json(
         {
@@ -39,7 +40,7 @@ export async function POST(req) {
     const inviteInfo = await consumeInvite(inviteCode, email);
     const role = inviteInfo.invite.role || "teacher";
 
-    const teacher = await createTeacher({ email, password, role });
+    const teacher = await createTeacher({ email, password, name, role });
     await markInviteUsed({
       rowIndex: inviteInfo.rowIndex,
       invite: inviteInfo.invite,
@@ -48,6 +49,7 @@ export async function POST(req) {
     });
     const token = signAuthToken({
       teacherId: teacher.teacherId,
+      name: teacher.name,
       email: teacher.email,
       role: teacher.role,
     });

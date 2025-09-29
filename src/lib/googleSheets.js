@@ -2,6 +2,7 @@ const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]; // read/write
 
 export const TEACHER_HEADERS = [
   "teacher_id",
+  "name",
   "email",
   "password_hash",
   "role",

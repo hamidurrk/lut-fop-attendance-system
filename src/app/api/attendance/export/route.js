@@ -25,18 +25,34 @@ function recordTitle(record) {
   return `${record.className || "Class"} - ${record.recordName || "Session"}`;
 }
 
+function teacherDisplayString(record) {
+  const segments = [];
+  if (record.teacherName) {
+    segments.push(record.teacherName);
+  }
+  if (record.teacherEmail) {
+    segments.push(`<${record.teacherEmail}>`);
+  }
+  if (record.teacherId) {
+    segments.push(`[${record.teacherId}]`);
+  }
+
+  return segments.join(" ").trim();
+}
+
 async function buildExcel(record) {
+  const teacherInfo = teacherDisplayString(record);
   const rows = [
     ["Class", record.className || ""],
-    ["Session", record.recordName || ""],
+    ["Record Name", record.recordName || ""],
     ["Created", formatDisplayDate(record.createdAt)],
-    ["Teacher", record.teacherId || ""],
+    ["Teacher", teacherInfo || record.teacherId || ""],
     [],
-    ["Student ID", "Student Name", "Timestamp"],
+    ["Timestamp", "Student ID", "Student Name" ],
     ...record.attendees.map((student) => [
+      formatDisplayDate(student.timestamp),
       student.studentId,
       student.studentName,
-      formatDisplayDate(student.timestamp),
     ]),
   ];
 
@@ -72,7 +88,7 @@ async function buildPdf(record) {
   writeLine("LUT FOP Attendance", 18, "bold");
   writeLine(recordTitle(record), 14);
   writeLine(`Created: ${formatDisplayDate(record.createdAt)}`);
-  writeLine(`Teacher: ${record.teacherId || ""}`);
+  writeLine(`Teacher: ${teacherDisplayString(record) || record.teacherId || ""}`);
   cursor -= 10;
   writeLine("Attendees", 14, "bold");
 

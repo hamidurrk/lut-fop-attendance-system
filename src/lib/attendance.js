@@ -3,7 +3,9 @@ import {
   appendRow,
   readRows,
   attendanceSheetName,
+  teacherSheetName,
   ATTENDANCE_HEADERS,
+  TEACHER_HEADERS,
 } from "@/lib/googleSheets";
 import { parseStudentQR } from "@/lib/qrFormat";
 
@@ -11,6 +13,45 @@ const META_FLAG = "__meta__";
 
 function normalizeString(value) {
   return value ? String(value).trim() : "";
+}
+
+async function fetchTeacherDirectory() {
+  const { headers, rows } = await readRows(teacherSheetName(), TEACHER_HEADERS);
+  const normalizedHeaders = headers.map((header) =>
+    header ? String(header).trim().toLowerCase() : ""
+  );
+
+  const teacherIdIndex = normalizedHeaders.indexOf("teacher_id");
+  if (teacherIdIndex === -1) {
+    return new Map();
+  }
+
+  const nameIndex = normalizedHeaders.indexOf("name");
+  const emailIndex = normalizedHeaders.indexOf("email");
+  const roleIndex = normalizedHeaders.indexOf("role");
+
+  const directory = new Map();
+
+  for (const row of rows) {
+    const teacherId = normalizeString(row[teacherIdIndex]);
+    if (!teacherId) {
+      continue;
+    }
+
+    const entry = {
+      teacherId,
+      name: nameIndex !== -1 ? normalizeString(row[nameIndex]) : "",
+      email: emailIndex !== -1 ? normalizeString(row[emailIndex]) : "",
+      role:
+        roleIndex !== -1 && normalizeString(row[roleIndex])
+          ? normalizeString(row[roleIndex])
+          : "teacher",
+    };
+
+    directory.set(teacherId, entry);
+  }
+
+  return directory;
 }
 
 export async function createAttendanceRecord({
@@ -122,6 +163,7 @@ export async function markAttendance({
 
 export async function listAttendance({ teacherId, isAdmin }) {
   const { rows } = await readRows(attendanceSheetName(), ATTENDANCE_HEADERS);
+  const teacherDirectory = await fetchTeacherDirectory();
   const grouped = new Map();
 
   for (const row of rows) {
@@ -149,11 +191,14 @@ export async function listAttendance({ teacherId, isAdmin }) {
     const cleanRecordName = normalizeString(recordName);
     const cleanStudentId = normalizeString(studentId);
     const cleanStudentName = normalizeString(studentName);
+    const teacherProfile = teacherDirectory.get(cleanTeacherId);
 
     if (!grouped.has(cleanRecordId)) {
       grouped.set(cleanRecordId, {
         recordId: cleanRecordId,
         teacherId: cleanTeacherId,
+        teacherName: teacherProfile?.name || "",
+        teacherEmail: teacherProfile?.email || "",
         className: cleanClass,
         recordName: cleanRecordName,
         createdAt: null,
@@ -162,6 +207,11 @@ export async function listAttendance({ teacherId, isAdmin }) {
     }
 
     const bucket = grouped.get(cleanRecordId);
+
+    if (teacherProfile) {
+      bucket.teacherName = teacherProfile.name;
+      bucket.teacherEmail = teacherProfile.email;
+    }
 
     if (cleanClass) bucket.className = cleanClass;
     if (cleanRecordName) bucket.recordName = cleanRecordName;
@@ -188,7 +238,7 @@ export async function listAttendance({ teacherId, isAdmin }) {
     byClass.set(key, list);
   }
 
-  return Array.from(byClass.entries())
+  const recordsByClass = Array.from(byClass.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([className, records]) => ({
       className,
@@ -198,6 +248,17 @@ export async function listAttendance({ teacherId, isAdmin }) {
         return bTime - aTime;
       }),
     }));
+
+  const teachers = Array.from(teacherDirectory.values()).sort((a, b) => {
+    const aLabel = a.name || a.email || a.teacherId;
+    const bLabel = b.name || b.email || b.teacherId;
+    return aLabel.localeCompare(bLabel, undefined, { sensitivity: "base" });
+  });
+
+  return {
+    records: recordsByClass,
+    teachers,
+  };
 }
 
 export async function getAttendanceRecord({
@@ -211,9 +272,12 @@ export async function getAttendanceRecord({
   }
 
   const { rows } = await readRows(attendanceSheetName(), ATTENDANCE_HEADERS);
+  const teacherDirectory = await fetchTeacherDirectory();
   const record = {
     recordId: targetId,
     teacherId: "",
+    teacherName: "",
+    teacherEmail: "",
     className: "",
     recordName: "",
     createdAt: null,
@@ -250,6 +314,12 @@ export async function getAttendanceRecord({
       record.teacherId = cleanTeacherId;
     }
 
+    const teacherProfile = teacherDirectory.get(cleanTeacherId);
+    if (teacherProfile) {
+      record.teacherName = teacherProfile.name;
+      record.teacherEmail = teacherProfile.email;
+    }
+
     found = true;
 
     const cleanClass = normalizeString(className);
@@ -276,6 +346,14 @@ export async function getAttendanceRecord({
 
   if (!found) {
     return null;
+  }
+
+  if (!record.teacherName && record.teacherId) {
+    const teacherProfile = teacherDirectory.get(record.teacherId);
+    if (teacherProfile) {
+      record.teacherName = teacherProfile.name;
+      record.teacherEmail = teacherProfile.email;
+    }
   }
 
   record.attendees.sort((a, b) => {
