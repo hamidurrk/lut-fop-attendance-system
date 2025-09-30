@@ -90,35 +90,27 @@ export default function TeacherLoginPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-12 px-6 pb-20 pt-16 sm:px-10 lg:flex-row lg:items-center lg:gap-16 lg:py-24">
+    <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-12 px-6 pb-20 pt-16 text-slate-700 sm:px-10 lg:flex-row lg:items-center lg:gap-16 lg:py-24">
       <div className="flex-1 space-y-6 text-left">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs font-semibold tracking-[0.3em] text-slate-300">
-          Teacher access · Orientation
+        <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1 text-xs font-semibold tracking-[0.3em] text-slate-600 shadow-sm">
+          LUT STAFF ACCESS
         </span>
-        <h1 className="text-4xl font-semibold text-white sm:text-5xl">
-          Manage attendance with confidence.
+        <h1 className="text-4xl font-semibold text-slate-900 sm:text-5xl">
+          LUT University Attendance Administration
         </h1>
-        <p className="text-lg text-slate-300">
-          Sign in to review previous sessions, launch a new record, and scan student QR codes straight from your browser. Admins can jump between instructors for complete oversight.
+        <p className="text-lg text-slate-600">
+          Sign in to maintain teaching records, open new attendance sessions, and review recent activity. Programme leads may switch between instructors for oversight.
         </p>
-        <ul className="space-y-3 text-sm text-slate-300">
+        <ul className="space-y-3 text-sm text-slate-600">
           <li className="flex items-start gap-3">
-            <span className="mt-0.5 text-emerald-400">✦</span>
-            <span>All data lives inside secure LUT-owned Google Sheets via a service account.</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="mt-0.5 text-emerald-400">✦</span>
-            <span>Invites keep access secure. Request one with your LUT email if you don’t have it yet.</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="mt-0.5 text-emerald-400">✦</span>
-            <span>Need help? Contact the LUT FOP coordination team for onboarding.</span>
+            <span className="mt-0.5 text-emerald-500">✦</span>
+            <span>Access is limited to LUT staff accounts. Use the request form if you require an invitation.</span>
           </li>
         </ul>
       </div>
 
-      <div className="flex-1 rounded-3xl border border-white/10 bg-slate-900/70 p-8 backdrop-blur-md">
-        <div className="mb-6 inline-flex rounded-full bg-white/10 p-1">
+      <div className="flex-1 rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_28px_65px_-38px_rgba(14,165,233,0.25)]">
+        <div className="mb-6 inline-flex rounded-full bg-slate-100 p-1">
           {[
             { id: "login", label: "Sign in" },
             { id: "signup", label: "Sign up" },
@@ -134,7 +126,7 @@ export default function TeacherLoginPage() {
               className={`rounded-full px-5 py-2 text-sm font-medium transition ${
                 mode === tab.id
                   ? "bg-emerald-400 text-emerald-950"
-                  : "text-slate-300 hover:text-white"
+                  : "text-slate-500 hover:text-slate-700"
               }`}
               type="button"
             >
@@ -149,23 +141,23 @@ export default function TeacherLoginPage() {
             className="space-y-6"
           >
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">
+              <label className="text-sm font-medium text-slate-700">
                 LUT email address
               </label>
               <input
                 type="email"
                 placeholder="firstname.lastname@lut.fi"
                 {...loginForm.register("email", { required: true })}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-base text-white outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">Password</label>
+              <label className="text-sm font-medium text-slate-700">Password</label>
               <input
                 type="password"
                 placeholder="••••••••"
                 {...loginForm.register("password", { required: true })}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-base text-white outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30"
               />
             </div>
             <button
@@ -181,55 +173,55 @@ export default function TeacherLoginPage() {
             className="space-y-6"
           >
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">
+              <label className="text-sm font-medium text-slate-700">
                 Full name
               </label>
               <input
                 type="text"
                 placeholder="Aino Virtanen"
                 {...signupForm.register("name", { required: true, minLength: 2 })}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-base text-white outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">
+              <label className="text-sm font-medium text-slate-700">
                 LUT email address
               </label>
               <input
                 type="email"
                 placeholder="firstname.lastname@lut.fi"
                 {...signupForm.register("email", { required: true })}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-base text-white outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">
+              <label className="text-sm font-medium text-slate-700">
                 Password (min. 8 characters)
               </label>
               <input
                 type="password"
                 placeholder="Strong password"
                 {...signupForm.register("password", { required: true, minLength: 8 })}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-base text-white outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-200">
+              <label className="text-sm font-medium text-slate-700">
                 Invite code
               </label>
               <input
                 type="text"
                 placeholder="Provided by programme lead"
                 {...signupForm.register("inviteCode", { required: true })}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-base text-white outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30"
               />
-              <p className="text-xs text-slate-400">
-                Need an invite? <button type="button" className="text-emerald-300 underline underline-offset-4" onClick={() => setShowRequestForm(true)}>Request access</button>
+              <p className="text-xs text-slate-500">
+                Need an invite? <button type="button" className="text-emerald-600 underline underline-offset-4" onClick={() => setShowRequestForm(true)}>Request access</button>
               </p>
             </div>
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-sky-400/90 px-6 py-3 text-base font-semibold text-sky-950 transition hover:bg-sky-300"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-400/90 px-6 py-3 text-base font-semibold text-sky-950 transition hover:bg-emerald-300"
             >
               Create account
             </button>
@@ -238,49 +230,49 @@ export default function TeacherLoginPage() {
         {showRequestForm && (
           <form
             onSubmit={requestForm.handleSubmit(handleRequestAccess)}
-            className="mt-8 space-y-4 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-6"
+            className="mt-8 space-y-4 rounded-2xl border border-emerald-300/40 bg-emerald-50 p-6"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-white">Request an invite</h3>
+              <h3 className="text-base font-semibold text-emerald-900">Request an invite</h3>
               <button
                 type="button"
                 onClick={() => setShowRequestForm(false)}
-                className="text-xs uppercase tracking-wide text-emerald-200"
+                className="text-xs uppercase tracking-wide text-emerald-600"
               >
                 Close
               </button>
             </div>
             <label className="block space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+              <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                 LUT email
               </span>
               <input
                 type="email"
                 placeholder="firstname.lastname@lut.fi"
                 {...requestForm.register("email", { required: true })}
-                className="w-full rounded-xl border border-emerald-400/40 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-400/20"
+                className="w-full rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30"
               />
             </label>
             <label className="block space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+              <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                 Full name
               </span>
               <input
                 type="text"
                 placeholder="Preferred display name"
                 {...requestForm.register("name")}
-                className="w-full rounded-xl border border-emerald-400/40 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-400/20"
+                className="w-full rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30"
               />
             </label>
             <label className="block space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+              <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                 Context (optional)
               </span>
               <textarea
                 rows={3}
                 placeholder="Which groups will you be teaching?"
                 {...requestForm.register("context")}
-                className="w-full rounded-xl border border-emerald-400/40 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-400/20"
+                className="w-full rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-300/30"
               />
             </label>
             <button

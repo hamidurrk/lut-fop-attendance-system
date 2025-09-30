@@ -1456,60 +1456,69 @@ const handleStopScanner = async () => {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 pb-24 pt-16 sm:px-10 lg:py-24">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-white sm:text-4xl">
-            Attendance dashboard
-          </h1>
-          <p className="mt-1 text-sm text-slate-300">
-            Signed in as {teacherDisplayName || auth.teacher.email}
-            {teacherDisplayEmail ? (
-              <span className="text-slate-400"> ({teacherDisplayEmail})</span>
-            ) : null}
-            {" · role: "}
-            {auth.teacher.role}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {auth.teacher.role === "admin" && (
-            <select
-              value={selectedTeacher}
-              onChange={(event) => setSelectedTeacher(event.target.value)}
-              className="rounded-full border border-white/10 bg-slate-900/70 px-4 py-2 text-sm text-white outline-none"
+    <div className="relative isolate mx-auto min-h-screen max-w-6xl px-6 pb-24 pt-16 sm:px-10 lg:py-24">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-32 left-[-18rem] h-[26rem] w-[26rem] rounded-full bg-emerald-200/25 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-36 right-[-14rem] h-[24rem] w-[24rem] rounded-full bg-emerald-100/30 blur-3xl"
+      />
+      <div className="relative z-10 flex flex-col gap-10 text-slate-700">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
+              Attendance dashboard
+            </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Signed in as {teacherDisplayName || auth.teacher.email}
+              {teacherDisplayEmail ? (
+                <span className="text-slate-500"> ({teacherDisplayEmail})</span>
+              ) : null}
+              {" · role: "}
+              {auth.teacher.role}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {auth.teacher.role === "admin" && (
+              <select
+                value={selectedTeacher}
+                onChange={(event) => setSelectedTeacher(event.target.value)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300/30"
+              >
+                <option value="all">All teachers</option>
+                {uniqueTeachers.map((teacher) => (
+                  <option key={teacher.teacherId} value={teacher.teacherId}>
+                    {teacher.name}
+                    {teacher.email ? ` · ${teacher.email}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={() => setShowCreate(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400"
             >
-              <option value="all">All teachers</option>
-              {uniqueTeachers.map((teacher) => (
-                <option key={teacher.teacherId} value={teacher.teacherId}>
-                  {teacher.name}
-                  {teacher.email ? ` · ${teacher.email}` : ""}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-400/90 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300"
-          >
-            New record
-          </button>
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm text-slate-200 transition hover:border-emerald-400 hover:text-white"
-          >
-            Log out
-          </button>
-        </div>
-      </header>
+              New record
+            </button>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700"
+            >
+              Log out
+            </button>
+          </div>
+        </header>
 
-      {showCreate && (
-        <form
-          onSubmit={handleCreateRecord}
-          className="rounded-3xl border border-emerald-400/30 bg-emerald-500/10 p-6 backdrop-blur-md"
-        >
+        {showCreate && (
+          <form
+            onSubmit={handleCreateRecord}
+            className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+          >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <label className="flex-1 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                 Class name
               </span>
               <input
@@ -1519,11 +1528,11 @@ const handleStopScanner = async () => {
                   setCreateForm((prev) => ({ ...prev, className: event.target.value }))
                 }
                 placeholder="FOP Exercise Group A"
-                className="w-full rounded-2xl border border-emerald-400/40 bg-slate-950/80 px-4 py-3 text-base text-white outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-400/20"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
               />
             </label>
             <label className="flex-1 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                 Record name
               </span>
               <input
@@ -1533,42 +1542,42 @@ const handleStopScanner = async () => {
                   setCreateForm((prev) => ({ ...prev, recordName: event.target.value }))
                 }
                 placeholder="Week 3 · Loops"
-                className="w-full rounded-2xl border border-emerald-400/40 bg-slate-950/80 px-4 py-3 text-base text-white outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-400/20"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
               />
             </label>
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="inline-flex items-center justify-center rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-emerald-950"
+                className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white"
               >
                 Launch scanner
               </button>
               <button
                 type="button"
                 onClick={() => setShowCreate(false)}
-                className="inline-flex items-center justify-center rounded-full border border-white/30 px-5 py-3 text-sm text-slate-200"
+                className="inline-flex items-center justify-center rounded-full border border-slate-300 px-5 py-3 text-sm text-slate-600 transition hover:border-slate-400 hover:text-slate-800"
               >
                 Cancel
               </button>
             </div>
           </div>
-        </form>
-      )}
+          </form>
+        )}
 
       {isScannerActive && activeRecord && (
-        <div className="grid gap-6 rounded-3xl border border-white/10 bg-slate-900/70 p-4 lg:p-6 lg:grid-cols-[320px_1fr]">
+        <div className="grid gap-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-lg lg:p-6 lg:grid-cols-[320px_1fr]">
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-semibold text-slate-900">
               Live scanner
             </h2>
-            <p className="text-sm text-slate-300">
-              Class <span className="font-medium text-white">{activeRecord.className}</span>
+            <p className="text-sm text-slate-600">
+              Class <span className="font-medium text-slate-900">{activeRecord.className}</span>
               <br />
-              Session <span className="font-medium text-white">{activeRecord.recordName}</span>
+              Session <span className="font-medium text-slate-900">{activeRecord.recordName}</span>
             </p>
             <div className="space-y-3">
               <div
-                className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-inner w-full"
+                className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner w-full"
                 style={{ 
                   aspectRatio: "1 / 1", 
                   minHeight: "240px",
@@ -1582,18 +1591,18 @@ const handleStopScanner = async () => {
                   className="h-full w-full [&>video]:!h-full [&>video]:!w-full [&>video]:!object-cover [&>video]:!max-w-none [&>canvas]:!h-full [&>canvas]:!w-full [&>canvas]:!object-cover [&>canvas]:!max-w-none"
                 />
                 {(cameraError || scannerStatus === "loading") && (
-                  <div className="absolute inset-0 grid place-items-center bg-slate-950/85 px-4 text-center text-xs text-slate-100">
+                  <div className="absolute inset-0 grid place-items-center bg-white/90 px-4 text-center text-xs text-slate-600">
                     {scannerStatus === "loading" && !cameraError ? (
                       <div>
-                        <p className="font-semibold text-emerald-100">Initializing camera…</p>
-                        <p className="mt-2 text-[10px] text-emerald-100/70">
+                        <p className="font-semibold text-emerald-700">Initializing camera…</p>
+                        <p className="mt-2 text-[10px] text-slate-500">
                           Allow camera access in your browser to start scanning.
                         </p>
                       </div>
                     ) : (
                       <div className="max-w-sm">
-                        <p className="font-semibold text-red-200 mb-2">Camera Access Error</p>
-                        <div className="text-[10px] text-red-100/90 whitespace-pre-line leading-relaxed">
+                        <p className="mb-2 font-semibold text-slate-700">Camera access issue</p>
+                        <div className="text-[10px] text-slate-500 whitespace-pre-line leading-relaxed">
                           {cameraError}
                         </div>
                       </div>
@@ -1613,18 +1622,18 @@ const handleStopScanner = async () => {
               </div>
               <div className="space-y-2">
                 {currentCameraLabel && (
-                  <p className="text-xs text-slate-400">
-                    Camera: <span className="text-slate-200">{currentCameraLabel}</span>
+                  <p className="text-xs text-slate-500">
+                    Camera: <span className="text-slate-700">{currentCameraLabel}</span>
                   </p>
                 )}
                 {!currentCameraLabel && cameraDevices.length === 0 && (
-                  <p className="text-xs text-amber-300">
+                  <p className="text-xs text-slate-500">
                     Waiting for camera access...
                   </p>
                 )}
                 {!isMobileDevice && cameraDevices.length > 1 && (
-                  <label className="block text-xs text-slate-300">
-                    <span className="mb-1 block font-semibold uppercase tracking-wide text-slate-500">
+                  <label className="block text-xs text-slate-500">
+                    <span className="mb-1 block font-semibold uppercase tracking-wide text-slate-600">
                       Camera source
                     </span>
                     <select
@@ -1632,7 +1641,7 @@ const handleStopScanner = async () => {
                       onChange={(event) =>
                         setSelectedDeviceId(event.target.value || null)
                       }
-                      className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/20"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-200/30"
                     >
                       {cameraDevices.map((device, index) => (
                         <option key={device.deviceId} value={device.deviceId}>
@@ -1647,7 +1656,7 @@ const handleStopScanner = async () => {
                     type="button"
                     onClick={cycleCameraReal}
                     disabled={scannerStatus === "loading"}
-                    className="inline-flex w-full items-center justify-center rounded-full border border-white/20 px-4 py-2 text-sm text-slate-200 transition hover:border-emerald-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {scannerStatus === "loading" ? "Switching..." : `Switch Camera (${currentCameraLabel || 'Unknown'})`}
                   </button>
@@ -1658,19 +1667,19 @@ const handleStopScanner = async () => {
               <button
                 type="button"
                 onClick={handleStopScanner}
-                className="inline-flex w-full items-center justify-center rounded-full border border-red-400/50 px-6 py-3 text-sm font-medium text-red-200 transition hover:border-red-400 hover:bg-red-500/10 hover:text-white"
+                className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 px-6 py-3 text-sm font-medium text-slate-600 transition hover:border-slate-400 hover:bg-slate-100"
               >
                 Stop Scanner
               </button>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
               Recently scanned
             </h3>
             <ul className="mt-4 flex max-h-64 flex-col gap-2 overflow-y-auto pr-2 text-sm">
               {Array.from(scannedStudents.values()).length === 0 && (
-                <li className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
+                <li className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-slate-500">
                   Scan a student QR to see live confirmations here.
                 </li>
               )}
@@ -1680,12 +1689,12 @@ const handleStopScanner = async () => {
                 .map((entry) => (
                   <li
                     key={`${entry.studentId}-${entry.timestamp}`}
-                    className="flex items-center justify-between rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3"
+                    className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"
                   >
-                    <span className="font-medium text-emerald-200">
+                    <span className="font-medium text-emerald-700">
                       {entry.studentName}
                     </span>
-                    <span className="text-xs text-emerald-100/80">
+                    <span className="text-xs text-emerald-600">
                       {entry.studentId}
                     </span>
                   </li>
@@ -1695,388 +1704,410 @@ const handleStopScanner = async () => {
         </div>
       )}
 
-      {isAdmin && (
-        <section className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl font-semibold text-white">Admin insights</h2>
-            <div className="inline-flex rounded-full bg-white/10 p-1">
-              {[
-                { id: "analytics", label: "Analytics" },
-                {
-                  id: "invites",
-                  label:
-                    activeInviteCount > 0
-                      ? `Invites (${activeInviteCount})`
-                      : "Invites",
-                },
-                {
-                  id: "requests",
-                  label:
-                    pendingRequests.length > 0
-                      ? `Requests (${pendingRequests.length})`
-                      : "Requests",
-                },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setAdminTab(tab.id)}
-                  className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                    adminTab === tab.id
-                      ? "bg-emerald-400 text-emerald-950"
-                      : "text-slate-200 hover:text-white"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {adminTab === "analytics" && (
-            <div className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Total sessions
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
-                    {analytics.totalSessions}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Attendance events
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
-                    {analytics.totalAttendees}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Unique students
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
-                    {analytics.uniqueStudents}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Active invites · Pending requests
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
-                    {activeInviteCount} · {pendingRequests.length}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
-                  <div className="flex flex-col gap-4 sm:flex-col sm:items-start sm:justify-between">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                      Top classes by attendance
-                    </h3>
-                    <div className="flex flex-wrap gap-4 text-xs sm:text-sm">
-                      <label className="flex flex-col gap-1">
-                        <span className="font-semibold uppercase tracking-wide text-slate-500">
-                          Class filter
-                        </span>
-                        <select
-                          value={analyticsClassFilter}
-                          onChange={(event) => setAnalyticsClassFilter(event.target.value)}
-                          className="rounded-xl border min-w-64 border-white/10 bg-slate-900/70 px-3 py-2 text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/20"
-                        >
-                          <option value="all">All classes</option>
-                          {analytics.classSummaries.map((cls) => (
-                            <option key={cls.className} value={cls.className}>
-                              {cls.className}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="font-semibold uppercase tracking-wide text-slate-500">
-                          Record filter
-                        </span>
-                        <select
-                          value={analyticsRecordFilter}
-                          onChange={(event) => setAnalyticsRecordFilter(event.target.value)}
-                          disabled={
-                            analyticsClassFilter === "all" || recordOptions.length === 0
-                          }
-                          className="rounded-xl border min-w-32 border-white/10 bg-slate-900/70 px-3 py-2 text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <option value="all">All records</option>
-                          {recordOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  </div>
-                  <ul className="mt-4 space-y-3 text-sm text-slate-200">
-                    {filteredTopClasses.length === 0 && (
-                      <li className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
-                        No attendance records yet.
-                      </li>
-                    )}
-                    {filteredTopClasses.map((entry, index) => (
-                      <li
-                        key={entry.className || index}
-                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+          {isAdmin && (
+            <section className="relative overflow-hidden rounded-4xl border border-slate-200 bg-white/90 p-6 shadow-lg backdrop-blur">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -top-20 right-[-14rem] h-64 w-64 rounded-full bg-emerald-200/20 blur-3xl"
+              />
+              <div className="relative z-10 space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-2xl font-semibold text-slate-900">Admin insights</h2>
+                  <div className="inline-flex rounded-full border border-slate-200 bg-white p-1">
+                    {[
+                      { id: "analytics", label: "Analytics" },
+                      {
+                        id: "invites",
+                        label:
+                          activeInviteCount > 0
+                            ? `Invites (${activeInviteCount})`
+                            : "Invites",
+                      },
+                      {
+                        id: "requests",
+                        label:
+                          pendingRequests.length > 0
+                            ? `Requests (${pendingRequests.length})`
+                            : "Requests",
+                      },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setAdminTab(tab.id)}
+                        className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                          adminTab === tab.id
+                            ? "bg-emerald-500 text-white"
+                            : "text-slate-500 hover:text-slate-700"
+                        }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="font-medium text-white">
-                            {analyticsClassFilter === "all" ? `${index + 1}. ` : ""}
-                            {entry.className}
-                          </span>
-                          <span className="text-xs text-slate-300">
-                            {entry.totalAttendees} students
-                          </span>
-                        </div>
-                        {entry.records.length > 0 && (
-                          <ul className="mt-3 space-y-2 text-xs text-slate-300">
-                            {entry.records.map((record) => (
-                              <li
-                                key={record.recordId}
-                                className="flex flex-col gap-1 rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2"
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {adminTab === "analytics" && (
+                  <div className="space-y-6">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 pb-4 pt-6 shadow-sm">
+                        <span className="absolute inset-x-4 top-2 h-[3px] rounded-full bg-emerald-200" aria-hidden="true" />
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Total sessions
+                        </p>
+                        <p className="mt-2 text-3xl font-semibold text-emerald-600">
+                          {analytics.totalSessions}
+                        </p>
+                      </div>
+                      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 pb-4 pt-6 shadow-sm">
+                        <span className="absolute inset-x-4 top-2 h-[3px] rounded-full bg-emerald-200" aria-hidden="true" />
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Attendance events
+                        </p>
+                        <p className="mt-2 text-3xl font-semibold text-emerald-600">
+                          {analytics.totalAttendees}
+                        </p>
+                      </div>
+                      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 pb-4 pt-6 shadow-sm">
+                        <span className="absolute inset-x-4 top-2 h-[3px] rounded-full bg-emerald-200" aria-hidden="true" />
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Unique students
+                        </p>
+                        <p className="mt-2 text-3xl font-semibold text-emerald-600">
+                          {analytics.uniqueStudents}
+                        </p>
+                      </div>
+                      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 pb-4 pt-6 shadow-sm">
+                        <span className="absolute inset-x-4 top-2 h-[3px] rounded-full bg-emerald-200" aria-hidden="true" />
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Active invites · Pending requests
+                        </p>
+                        <p className="mt-2 text-3xl font-semibold text-emerald-600">
+                          {activeInviteCount} · {pendingRequests.length}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div className="flex flex-col gap-4 sm:flex-col sm:items-start sm:justify-between">
+                          <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-600">
+                            Top classes by attendance
+                          </h3>
+                          <div className="flex flex-wrap gap-4 text-xs sm:text-sm">
+                            <label className="flex flex-col gap-1">
+                              <span className="font-semibold uppercase tracking-wide text-slate-600">
+                                Class filter
+                              </span>
+                              <select
+                                value={analyticsClassFilter}
+                                onChange={(event) => setAnalyticsClassFilter(event.target.value)}
+                                className="min-w-64 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300/20"
                               >
+                                <option value="all">All classes</option>
+                                {analytics.classSummaries.map((cls) => (
+                                  <option key={cls.className} value={cls.className}>
+                                    {cls.className}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="font-semibold uppercase tracking-wide text-slate-600">
+                                Record filter
+                              </span>
+                              <select
+                                value={analyticsRecordFilter}
+                                onChange={(event) => setAnalyticsRecordFilter(event.target.value)}
+                                disabled={
+                                  analyticsClassFilter === "all" || recordOptions.length === 0
+                                }
+                                className="min-w-32 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300/20 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                              >
+                                <option value="all">All records</option>
+                                {recordOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                        </div>
+                        <ul className="mt-4 space-y-3 text-sm text-slate-600">
+                          {filteredTopClasses.length === 0 && (
+                            <li className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-slate-500">
+                              No attendance records yet.
+                            </li>
+                          )}
+                          {filteredTopClasses.map((entry, index) => (
+                            <li
+                              key={entry.className || index}
+                              className="relative overflow-hidden rounded-xl border border-slate-200 bg-white pl-6 pr-4 py-4 shadow-sm"
+                            >
+                              <span
+                                aria-hidden="true"
+                                className="absolute inset-y-3 left-2 w-[3px] rounded-full bg-emerald-300"
+                              />
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="font-medium text-emerald-900">
+                                  {analyticsClassFilter === "all" ? `${index + 1}. ` : ""}
+                                  {entry.className}
+                                </span>
+                                <span className="text-xs font-semibold text-emerald-700">
+                                  {entry.totalAttendees} students
+                                </span>
+                              </div>
+                              {entry.records.length > 0 && (
+                                <ul className="mt-3 space-y-2 text-xs text-slate-500">
+                                  {entry.records.map((record) => (
+                                    <li
+                                      key={record.recordId}
+                                      className="flex flex-col gap-1 rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2"
+                                    >
+                                      <div className="flex items-start justify-between gap-3">
+                                        <span className="font-medium text-emerald-900">
+                                          {record.recordName}
+                                        </span>
+                                        <span className="text-[11px] font-semibold text-emerald-700">
+                                          {record.attendeeCount} students
+                                        </span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                                        {record.teacherName ? (
+                                          <span>
+                                            Teacher: <span className="font-medium text-emerald-700">{record.teacherName}</span>
+                                            {record.teacherEmail
+                                              ? ` · ${record.teacherEmail}`
+                                              : ""}
+                                          </span>
+                                        ) : null}
+                                        {record.createdAt ? (
+                                          <span>
+                                            {formatDateOnly(record.createdAt)}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-600">
+                          Classes & teacher activity
+                        </h3>
+                        <ul className="mt-4 space-y-3 text-sm text-slate-600">
+                          {analytics.teacherActivity.length === 0 && (
+                            <li className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-slate-500">
+                              No data captured yet.
+                            </li>
+                          )}
+                          {analytics.teacherActivity.slice(0, 6).map((entry, index) => {
+                            const primary = entry.primaryTeacher;
+                            const primaryDisplay = primary
+                              ? primary.teacherName?.trim() ||
+                                primary.teacherEmail ||
+                                primary.teacherId ||
+                                "Unknown"
+                              : "Unknown";
+                            const secondaryDisplay = entry.additionalTeachers
+                              .map((teacher) =>
+                                teacher.teacherName?.trim() ||
+                                teacher.teacherEmail ||
+                                teacher.teacherId ||
+                                "Unknown"
+                              )
+                              .slice(0, 2);
+
+                            return (
+                              <li
+                                key={entry.className || index}
+                                className="relative overflow-hidden rounded-xl border border-slate-200 bg-white pl-6 pr-4 py-4 shadow-sm"
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className="absolute inset-y-3 left-2 w-[3px] rounded-full bg-emerald-300"
+                                />
                                 <div className="flex items-start justify-between gap-3">
-                                  <span className="font-medium text-white">
-                                    {record.recordName}
+                                  <span className="font-medium text-slate-900">
+                                    {index + 1}. {entry.className}
                                   </span>
-                                  <span className="text-[11px] text-slate-300">
-                                    {record.attendeeCount} students
+                                  <span className="text-xs font-semibold text-emerald-700">
+                                    {entry.totalAttendees} students
                                   </span>
                                 </div>
-                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
-                                  {record.teacherName ? (
-                                    <span>
-                                      Teacher: {record.teacherName}
-                                      {record.teacherEmail
-                                        ? ` · ${record.teacherEmail}`
+                                <div className="mt-2 space-y-1 text-xs text-slate-500">
+                                  <p>
+                                    Teacher: <span className="font-semibold text-emerald-700">{primaryDisplay}</span>
+                                    {primary?.teacherEmail && primary.teacherEmail !== primaryDisplay ? (
+                                      <span className="text-slate-400"> · {primary.teacherEmail}</span>
+                                    ) : null}
+                                  </p>
+                                  {secondaryDisplay.length > 0 && (
+                                    <p className="text-[11px] text-slate-500">
+                                      Additional: {secondaryDisplay.join(", ")}
+                                      {entry.additionalTeachers.length > secondaryDisplay.length
+                                        ? "…"
                                         : ""}
-                                    </span>
-                                  ) : null}
-                                  {record.createdAt ? (
-                                    <span>
-                                      {formatDateOnly(record.createdAt)}
-                                    </span>
-                                  ) : null}
+                                    </p>
+                                  )}
+                                  <p className="text-[11px] text-slate-500">
+                                    Sessions: <span className="font-semibold text-emerald-700">{entry.totalSessions}</span>
+                                  </p>
                                 </div>
                               </li>
-                            ))}
-                          </ul>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+                            Attendance trends by record
+                          </h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Student counts per record grouped by class within the selected date range (inclusive).
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs sm:text-sm">
+                          <label className="flex flex-col gap-1">
+                            <span className="font-semibold uppercase tracking-wide text-slate-600">
+                              From date
+                            </span>
+                            <input
+                              type="date"
+                              value={graphStartDate}
+                              onChange={(event) => setGraphStartDate(event.target.value)}
+                              min={analytics.minDateIso || undefined}
+                              max={analytics.maxDateIso || undefined}
+                              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300/20"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="font-semibold uppercase tracking-wide text-slate-600">
+                              To date
+                            </span>
+                            <input
+                              type="date"
+                              value={graphEndDate}
+                              onChange={(event) => setGraphEndDate(event.target.value)}
+                              min={analytics.minDateIso || undefined}
+                              max={analytics.maxDateIso || undefined}
+                              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300/20"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      <div className="mt-6 space-y-6">
+                        {!attendanceGraph.rangeProvided && (
+                          <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-slate-500">
+                            Select a start and end date to generate the graph.
+                          </div>
                         )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                    Classes
-                  </h3>
-                  <ul className="mt-4 space-y-3 text-sm text-slate-200">
-                    {analytics.teacherActivity.length === 0 && (
-                      <li className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
-                        No data captured yet.
-                      </li>
-                    )}
-                    {analytics.teacherActivity.slice(0, 6).map((entry, index) => {
-                      const primary = entry.primaryTeacher;
-                      const primaryDisplay = primary
-                        ? primary.teacherName?.trim() ||
-                          primary.teacherEmail ||
-                          primary.teacherId ||
-                          "Unknown"
-                        : "Unknown";
-                      const secondaryDisplay = entry.additionalTeachers
-                        .map((teacher) =>
-                          teacher.teacherName?.trim() ||
-                          teacher.teacherEmail ||
-                          teacher.teacherId ||
-                          "Unknown"
-                        )
-                        .slice(0, 2);
-
-                      return (
-                        <li
-                          key={entry.className || index}
-                          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <span className="font-medium text-white">
-                              {index + 1}. {entry.className}
-                            </span>
-                            <span className="text-xs text-slate-300">
-                              {entry.totalAttendees} students
-                            </span>
+                        {attendanceGraph.rangeProvided && !attendanceGraph.rangeValid && (
+                          <div className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-6 text-center text-slate-600">
+                            <span className="font-semibold text-emerald-700">Invalid date range.</span> Ensure the start date is on or before the end date.
                           </div>
-                          <div className="mt-2 space-y-1 text-xs text-slate-300">
-                            <p>
-                              Lead teacher: <span className="text-white">{primaryDisplay}</span>
-                              {primary?.teacherEmail && primary.teacherEmail !== primaryDisplay
-                                ? ` · ${primary.teacherEmail}`
-                                : ""}
-                            </p>
-                            {secondaryDisplay.length > 0 && (
-                              <p className="text-[11px] text-slate-400">
-                                Additional: {secondaryDisplay.join(", ")}
-                                {entry.additionalTeachers.length > secondaryDisplay.length
-                                  ? "…"
-                                  : ""}
-                              </p>
-                            )}
-                            <p className="text-[11px] text-slate-400">
-                              Sessions: {entry.totalSessions}
-                            </p>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                      Attendance trends by record
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-300">
-                      Student counts per record grouped by class within the selected date range (inclusive).
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-3 text-xs sm:text-sm">
-                    <label className="flex flex-col gap-1">
-                      <span className="font-semibold uppercase tracking-wide text-slate-500">
-                        From date
-                      </span>
-                      <input
-                        type="date"
-                        value={graphStartDate}
-                        onChange={(event) => setGraphStartDate(event.target.value)}
-                        min={analytics.minDateIso || undefined}
-                        max={analytics.maxDateIso || undefined}
-                        className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/20"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="font-semibold uppercase tracking-wide text-slate-500">
-                        To date
-                      </span>
-                      <input
-                        type="date"
-                        value={graphEndDate}
-                        onChange={(event) => setGraphEndDate(event.target.value)}
-                        min={analytics.minDateIso || undefined}
-                        max={analytics.maxDateIso || undefined}
-                        className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-400/20"
-                      />
-                    </label>
-                  </div>
-                </div>
-                <div className="mt-6 space-y-6">
-                  {!attendanceGraph.rangeProvided && (
-                    <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
-                      Select a start and end date to generate the graph.
-                    </div>
-                  )}
-                  {attendanceGraph.rangeProvided && !attendanceGraph.rangeValid && (
-                    <div className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-6 text-center text-red-200">
-                      Invalid date range. Ensure the start date is on or before the end date.
-                    </div>
-                  )}
-                  {attendanceGraph.rangeProvided &&
-                    attendanceGraph.rangeValid &&
-                    !attendanceGraph.hasData && (
-                      <div className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
-                        No records found within the selected range.
-                      </div>
-                    )}
-                  {attendanceGraph.rangeProvided &&
-                    attendanceGraph.rangeValid &&
-                    attendanceGraph.hasData && (
-                      <div className="space-y-6">
-                        {attendanceGraph.classes.map((classEntry) => (
-                          <div
-                            key={classEntry.className}
-                            className="rounded-2xl border border-white/10 bg-slate-900/60 p-4"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <h4 className="text-sm font-semibold text-white">
-                                  {classEntry.className}
-                                </h4>
-                                <p className="text-[11px] uppercase tracking-wide text-slate-400">
-                                  {classEntry.records.length} record{classEntry.records.length === 1 ? "" : "s"}
-                                </p>
-                              </div>
-                              <span className="text-xs text-slate-300">
-                                {classEntry.totalAttendees} students
-                              </span>
+                        )}
+                        {attendanceGraph.rangeProvided &&
+                          attendanceGraph.rangeValid &&
+                          !attendanceGraph.hasData && (
+                            <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-slate-500">
+                              No records found within the selected range.
                             </div>
-                            <div className="mt-4 space-y-3">
-                              {classEntry.records.map((record) => {
-                                const widthPercentage = attendanceGraph.maxCount
-                                  ? Math.max(
-                                      6,
-                                      Math.round(
-                                        (record.attendeeCount / attendanceGraph.maxCount) *
-                                          100
-                                      )
-                                    )
-                                  : 0;
-
-                                return (
-                                  <div
-                                    key={`${classEntry.className}-${record.recordId}`}
-                                    className="space-y-1"
-                                  >
-                                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
-                                      <span className="font-medium text-white">
-                                        {record.recordName}
-                                      </span>
-                                      <span>
-                                        {formatDateOnly(record.createdAt)} · {record.attendeeCount} students
-                                      </span>
+                          )}
+                        {attendanceGraph.rangeProvided &&
+                          attendanceGraph.rangeValid &&
+                          attendanceGraph.hasData && (
+                            <div className="space-y-6">
+                              {attendanceGraph.classes.map((classEntry) => (
+                                <div
+                                  key={classEntry.className}
+                                  className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white pl-6 pr-4 py-4 shadow-sm"
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    className="absolute inset-y-4 left-3 w-[3px] rounded-full bg-emerald-300"
+                                  />
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <h4 className="text-sm font-semibold text-slate-900">
+                                        {classEntry.className}
+                                      </h4>
+                                      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                                        {classEntry.records.length} record{classEntry.records.length === 1 ? "" : "s"}
+                                      </p>
                                     </div>
-                                    <div className="h-3 w-full rounded-full bg-white/10">
-                                      <div
-                                        className="h-3 rounded-full bg-emerald-400"
-                                        style={{ width: `${widthPercentage}%` }}
-                                      />
-                                    </div>
+                                    <span className="text-xs font-semibold text-emerald-700">
+                                      {classEntry.totalAttendees} students
+                                    </span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                </div>
-              </div>
-            </div>
-          )}
+                                  <div className="mt-4 space-y-3">
+                                    {classEntry.records.map((record) => {
+                                      const widthPercentage = attendanceGraph.maxCount
+                                        ? Math.max(
+                                            6,
+                                            Math.round(
+                                              (record.attendeeCount / attendanceGraph.maxCount) *
+                                                100
+                                            )
+                                          )
+                                        : 0;
 
-          {adminTab === "invites" && (
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
-              <form
-                onSubmit={createInviteFromForm}
-                className="rounded-3xl border border-emerald-400/40 bg-emerald-500/10 p-6"
-              >
-                <h3 className="text-base font-semibold text-white">
+                                      return (
+                                        <div
+                                          key={`${classEntry.className}-${record.recordId}`}
+                                          className="space-y-1"
+                                        >
+                                          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                                            <span className="font-medium text-emerald-800">
+                                              {record.recordName}
+                                            </span>
+                                            <span>
+                                              {formatDateOnly(record.createdAt)} · {record.attendeeCount} students
+                                            </span>
+                                          </div>
+                                          <div className="h-3 w-full rounded-full bg-emerald-100/70">
+                                            <div
+                                              className="h-3 rounded-full bg-emerald-500"
+                                              style={{ width: `${widthPercentage}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {adminTab === "invites" && (
+                  <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
+                    <form
+                      onSubmit={createInviteFromForm}
+                      className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+                    >
+                <h3 className="text-base font-semibold text-slate-900">
                   Generate invite
                 </h3>
-                <p className="mt-1 text-xs text-emerald-100/80">
+                <p className="mt-1 text-xs text-slate-500">
                   Email is optional—leave blank for transferable codes.
                 </p>
-                <div className="mt-6 space-y-4 text-sm">
+                <div className="mt-6 space-y-4 text-sm text-slate-600">
                   <label className="block space-y-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Email (optional)
                     </span>
                     <input
@@ -2089,11 +2120,11 @@ const handleStopScanner = async () => {
                         }))
                       }
                       placeholder="firstname.lastname@lut.fi"
-                      className="w-full rounded-xl border border-emerald-400/40 bg-slate-950/60 px-4 py-3 text-white outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-400/20"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
                     />
                   </label>
                   <label className="block space-y-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Role
                     </span>
                     <select
@@ -2104,14 +2135,14 @@ const handleStopScanner = async () => {
                           role: event.target.value,
                         }))
                       }
-                      className="w-full rounded-xl border border-emerald-400/40 bg-slate-950/60 px-4 py-3 text-white outline-none"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 outline-none focus:border-emerald-400"
                     >
                       <option value="teacher">Teacher</option>
                       <option value="admin">Admin</option>
                     </select>
                   </label>
                   <label className="block space-y-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Expires in (days)
                     </span>
                     <input
@@ -2124,11 +2155,11 @@ const handleStopScanner = async () => {
                           expiresInDays: event.target.value,
                         }))
                       }
-                      className="w-full rounded-xl border border-emerald-400/40 bg-slate-950/60 px-4 py-3 text-white outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-400/20"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
                     />
                   </label>
                   <label className="block space-y-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Notes (optional)
                     </span>
                     <textarea
@@ -2141,7 +2172,7 @@ const handleStopScanner = async () => {
                         }))
                       }
                       placeholder="Week 4 tutors"
-                      className="w-full rounded-xl border border-emerald-400/40 bg-slate-950/60 px-4 py-3 text-white outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-400/20"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
                     />
                   </label>
                 </div>
@@ -2154,23 +2185,23 @@ const handleStopScanner = async () => {
                 </button>
               </form>
 
-              <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
                     Invite log
                   </h3>
                   {loadingAdminData && (
-                    <span className="text-xs text-slate-400">Refreshing…</span>
+                    <span className="text-xs text-slate-500">Refreshing…</span>
                   )}
                 </div>
                 {sortedInvites.length === 0 ? (
-                  <div className="mt-6 rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-slate-500">
+                  <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-slate-500">
                     No invites generated yet.
                   </div>
                 ) : (
                   <div className="mt-6 overflow-x-auto">
-                    <table className="min-w-full text-left text-xs text-slate-200">
-                      <thead className="text-[11px] uppercase tracking-wide text-slate-400">
+                    <table className="min-w-full text-left text-xs text-slate-600">
+                      <thead className="text-[11px] uppercase tracking-wide text-slate-500">
                         <tr>
                           <th className="px-3 py-2">Code</th>
                           <th className="px-3 py-2">Email</th>
@@ -2180,35 +2211,33 @@ const handleStopScanner = async () => {
                           <th className="px-3 py-2">Used</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5">
+                      <tbody className="divide-y divide-slate-100">
                         {sortedInvites.map((invite) => (
-                          <tr key={invite.invite_code}>
-                            <td className="px-3 py-2 font-mono text-[11px] text-emerald-200">
+                          <tr key={invite.invite_code} className="bg-white">
+                            <td className="px-3 py-2 font-mono text-[11px] text-emerald-700">
                               {invite.invite_code}
                             </td>
-                            <td className="px-3 py-2 text-[11px] text-slate-300">
+                            <td className="px-3 py-2 text-[11px] text-slate-500">
                               {invite.email || "—"}
                             </td>
-                            <td className="px-3 py-2 text-[11px] text-slate-300">
+                            <td className="px-3 py-2 text-[11px] text-slate-500">
                               {invite.role}
                             </td>
                             <td className="px-3 py-2 text-[11px]">
                               <span
                                 className={`inline-flex rounded-full px-3 py-1 font-medium ${
                                   invite.status === "active"
-                                    ? "bg-emerald-500/20 text-emerald-200"
-                                    : invite.status === "used"
-                                    ? "bg-sky-500/20 text-sky-200"
-                                    : "bg-slate-500/20 text-slate-200"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-slate-100 text-slate-600"
                                 }`}
                               >
                                 {invite.status}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-[11px] text-slate-300">
+                            <td className="px-3 py-2 text-[11px] text-slate-500">
                               {invite.expires_at ? formatDate(invite.expires_at) : "—"}
                             </td>
-                            <td className="px-3 py-2 text-[11px] text-slate-300">
+                            <td className="px-3 py-2 text-[11px] text-slate-500">
                               {invite.used_at ? formatDate(invite.used_at) : "—"}
                             </td>
                           </tr>
@@ -2219,29 +2248,29 @@ const handleStopScanner = async () => {
                 )}
               </div>
             </div>
-          )}
+            )}
 
-          {adminTab === "requests" && (
+            {adminTab === "requests" && (
             <div className="space-y-4">
               {loadingAdminData && (
-                <span className="text-xs text-slate-400">Refreshing…</span>
+                <span className="text-xs text-slate-500">Refreshing…</span>
               )}
               {pendingRequests.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-white/10 bg-slate-950/60 px-6 py-10 text-center text-slate-400">
+                <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center text-slate-500">
                   All caught up—no pending requests.
                 </div>
               ) : (
                 pendingRequests.map((request) => (
                   <div
                     key={request.request_id}
-                    className="rounded-3xl border border-white/10 bg-slate-950/60 p-6"
+                    className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-white">
+                        <p className="text-sm font-semibold text-slate-900">
                           {request.email}
                         </p>
-                        <p className="text-xs text-slate-300">
+                        <p className="text-xs text-slate-500">
                           {request.name || "No name provided"}
                         </p>
                       </div>
@@ -2250,7 +2279,7 @@ const handleStopScanner = async () => {
                       </span>
                     </div>
                     {request.context && (
-                      <p className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-slate-200">
+                      <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
                         {request.context}
                       </p>
                     )}
@@ -2262,7 +2291,7 @@ const handleStopScanner = async () => {
                           handlingRequest?.id === request.request_id &&
                           handlingRequest?.action === "approve"
                         }
-                        className="inline-flex items-center rounded-full bg-emerald-400 px-4 py-2 font-semibold text-emerald-950 disabled:opacity-60"
+                        className="inline-flex items-center rounded-full bg-emerald-500 px-4 py-2 font-semibold text-white disabled:opacity-60"
                       >
                         Approve (Teacher)
                       </button>
@@ -2273,7 +2302,7 @@ const handleStopScanner = async () => {
                           handlingRequest?.id === request.request_id &&
                           handlingRequest?.action === "approve"
                         }
-                        className="inline-flex items-center rounded-full border border-sky-400/60 px-4 py-2 font-semibold text-sky-200 disabled:opacity-60"
+                        className="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 font-semibold text-slate-600 disabled:opacity-60"
                       >
                         Approve as Admin
                       </button>
@@ -2284,7 +2313,7 @@ const handleStopScanner = async () => {
                           handlingRequest?.id === request.request_id &&
                           handlingRequest?.action === "decline"
                         }
-                        className="inline-flex items-center rounded-full border border-white/20 px-4 py-2 font-semibold text-slate-200 hover:border-red-400 hover:text-white disabled:opacity-60"
+                        className="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 font-semibold text-slate-600 disabled:opacity-60"
                       >
                         Decline
                       </button>
@@ -2293,32 +2322,36 @@ const handleStopScanner = async () => {
                 ))
               )}
             </div>
-          )}
+            )}
+          </div>
         </section>
       )}
 
-      <section className="space-y-4">
+  <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-white">Attendance history</h2>
-          <span className="text-xs uppercase tracking-wide text-slate-400">
+          <h2 className="text-2xl font-semibold text-slate-900">Attendance history</h2>
+          <span className="text-xs uppercase tracking-wide text-slate-500">
             {loading ? "Loading…" : `${records.length} class${records.length === 1 ? "" : "es"}`}
           </span>
         </div>
         {records.length === 0 && !loading && (
-          <div className="rounded-3xl border border-dashed border-white/10 bg-slate-900/60 px-6 py-12 text-center text-slate-400">
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center text-slate-500">
             No attendance records yet. Create a new one to get started.
           </div>
         )}
 
         <div className="space-y-6">
           {records.map((group) => (
-            <div key={group.className} className="rounded-3xl border border-white/10 bg-slate-900/60 p-6">
+            <div
+              key={group.className}
+              className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h3 className="text-xl font-semibold text-white">
+                  <h3 className="text-xl font-semibold text-slate-900">
                     {group.className}
                   </h3>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-slate-500">
                     {group.records.length} session{group.records.length === 1 ? "" : "s"}
                   </p>
                 </div>
@@ -2327,57 +2360,29 @@ const handleStopScanner = async () => {
                 {group.records.map((record) => (
                   <div
                     key={record.recordId}
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 p-4"
+                    className="rounded-2xl border border-slate-200 bg-white p-4"
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm uppercase tracking-wide text-slate-400">
+                        <p className="text-sm uppercase tracking-wide text-slate-500">
                           {formatDate(record.createdAt)}
                         </p>
-                        <h4 className="text-lg font-semibold text-white">
+                        <h4 className="text-lg font-semibold text-slate-900">
                           {record.recordName}
                         </h4>
                         {(record.teacherName || record.teacherEmail || record.teacherId) && (
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 text-xs text-slate-500">
                             Teacher: {record.teacherName || record.teacherEmail || record.teacherId}
                             {record.teacherName && record.teacherEmail ? (
-                              <span className="text-slate-500"> · {record.teacherEmail}</span>
+                              <span className="text-slate-400"> · {record.teacherEmail}</span>
                             ) : null}
                           </p>
                         )}
-                      </div>
-                      <div className="flex flex-wrap gap-3">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-1 text-xs text-slate-200">
+                        <span className="inline-flex items-center gap-4 mt-2 rounded-full border border-emerald-200 bg-white px-4 py-1 text-xs font-semibold text-emerald-700">
                           {record.attendees.length} attendee{record.attendees.length === 1 ? "" : "s"}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => handleExportRecord(record, "excel")}
-                          disabled={
-                            downloadingRecord?.id === record.recordId &&
-                            downloadingRecord?.format === "excel"
-                          }
-                          className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 px-4 py-2 text-xs font-semibold text-emerald-200 hover:border-emerald-300 hover:text-emerald-50 disabled:opacity-60"
-                        >
-                          {downloadingRecord?.id === record.recordId &&
-                          downloadingRecord?.format === "excel"
-                            ? "Exporting…"
-                            : "Export Excel"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleExportRecord(record, "pdf")}
-                          disabled={
-                            downloadingRecord?.id === record.recordId &&
-                            downloadingRecord?.format === "pdf"
-                          }
-                          className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-white/40 hover:text-white disabled:opacity-60"
-                        >
-                          {downloadingRecord?.id === record.recordId &&
-                          downloadingRecord?.format === "pdf"
-                            ? "Exporting…"
-                            : "Export PDF"}
-                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
                         {activeRecord?.recordId === record.recordId ? (
                           <button
                             type="button"
@@ -2386,9 +2391,9 @@ const handleStopScanner = async () => {
                               setCameraError(null);
                               setScannerStatus("loading");
                             }}
-                            className="inline-flex items-center gap-2 rounded-full bg-emerald-400/90 px-4 py-2 text-xs font-semibold text-emerald-950"
+                            className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-2 text-xs font-semibold text-emerald-950 shadow-sm"
                           >
-                            Start scanner
+                            Scanner started
                           </button>
                         ) : (
                           <button
@@ -2404,22 +2409,50 @@ const handleStopScanner = async () => {
                               lastQrTimeRef.current = 0;
                               setScannerStatus("loading");
                             }}
-                            className="inline-flex items-center gap-2 rounded-full border border-emerald-400/50 px-4 py-2 text-xs font-semibold text-emerald-200"
+                            className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-white px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-500 hover:text-black"
                           >
                             Scan for this record
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => handleExportRecord(record, "pdf")}
+                          disabled={
+                            downloadingRecord?.id === record.recordId &&
+                            downloadingRecord?.format === "pdf"
+                          }
+                          className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-white px-4 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-500 hover:text-black disabled:opacity-60"
+                        >
+                          {downloadingRecord?.id === record.recordId &&
+                          downloadingRecord?.format === "pdf"
+                            ? "Exporting…"
+                            : "Export PDF"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleExportRecord(record, "excel")}
+                          disabled={
+                            downloadingRecord?.id === record.recordId &&
+                            downloadingRecord?.format === "excel"
+                          }
+                          className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-500 px-4 py-2 text-xs font-semibold text-emerald-1000 transition hover:bg-emerald-600 hover:text-black disabled:opacity-60"
+                        >
+                          {downloadingRecord?.id === record.recordId &&
+                          downloadingRecord?.format === "excel"
+                            ? "Exporting…"
+                            : "Export Excel"}
+                        </button>
                       </div>
                     </div>
                     {record.attendees.length > 0 && (
-                      <ul className="mt-4 grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
+                      <ul className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
                         {record.attendees.map((student) => (
                           <li
                             key={`${student.studentId}-${student.timestamp}`}
-                            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2"
                           >
-                            <span>{student.studentName}</span>
-                            <span className="text-xs text-slate-300">
+                            <span className="text-s text-slate-700">{student.studentName}</span>
+                            <span className="text-xs text-slate-500">
                               {student.studentId}
                             </span>
                           </li>
@@ -2433,6 +2466,7 @@ const handleStopScanner = async () => {
           ))}
         </div>
       </section>
+      </div>
     </div>
   );
 }
